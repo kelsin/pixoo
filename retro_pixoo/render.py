@@ -79,7 +79,7 @@ def profile_frame(p: Profile, fetcher: ImageFetcher) -> Image.Image:
 
     # Points, large
     font.draw_text(img, 2, 21, "POINTS", GREY)
-    pts = _compact(p.points)
+    pts = _compact(p.points or p.softcore_points)  # hardcore, else softcore
     scale = 2 if font.text_width(pts, 2) <= 60 else 1
     font.draw_text(img, 2, 28, pts, GOLD, scale=scale)
 

@@ -48,6 +48,7 @@ class GameProgress:
 class Profile:
     user: str
     points: int
+    softcore_points: int
     true_points: int
     rank: int | None
     total_ranked: int | None
@@ -117,6 +118,7 @@ def parse_summary(data: dict[str, Any]) -> Profile:
     return Profile(
         user=data.get("User", ""),
         points=_int(data.get("TotalPoints")),
+        softcore_points=_int(data.get("TotalSoftcorePoints")),
         true_points=_int(data.get("TotalTruePoints")),
         rank=_int(rank) if rank is not None else None,
         total_ranked=_int(total) if total is not None else None,

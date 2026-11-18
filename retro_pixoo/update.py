@@ -36,11 +36,9 @@ def collect_pages(
     pages: list[Image.Image] = []
     if profile is not None:
         pages.append(profile_frame(profile, fetcher))
-    if entries is not None:
-        pages.append(last_watched_frame(entries, fetcher))
-    if profile is not None:
         pages.append(recent_frame(profile, fetcher))
     if entries is not None:
+        pages.append(last_watched_frame(entries, fetcher))
         pages.append(diary_frame(entries, fetcher))
     return pages, errors
 

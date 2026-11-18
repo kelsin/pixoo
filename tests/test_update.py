@@ -26,8 +26,8 @@ class UpdateTests(unittest.TestCase):
         self.assertEqual(errors, [])
         self.assertEqual(len(pages), 4)
         expected = [
-            profile_frame(p, self.fetcher), last_watched_frame(e, self.fetcher),
-            recent_frame(p, self.fetcher), diary_frame(e, self.fetcher),
+            profile_frame(p, self.fetcher), recent_frame(p, self.fetcher),
+            last_watched_frame(e, self.fetcher), diary_frame(e, self.fetcher),
         ]
         for got, want in zip(pages, expected):
             self.assertEqual(got.tobytes(), want.tobytes())

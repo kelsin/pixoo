@@ -6,6 +6,7 @@ Meant for cron. Pages from a failing source are skipped; exit code 1 if anything
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 from pathlib import Path
 from typing import Callable
@@ -49,7 +50,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--lb-user", default="kelsin13")
     ap.add_argument("--sample", action="store_true", help="use bundled sample data, no network")
     ap.add_argument("--preview", type=Path, help="write PNG/GIF previews to this directory")
-    ap.add_argument("--send", metavar="IP", help="push frames to the Pixoo at this IP")
+    ap.add_argument("--send", metavar="IP", default=os.environ.get("PIXOO_IP"),
+                    help="push frames to the Pixoo at this IP (default: $PIXOO_IP)")
     ap.add_argument("--endpoint", default="/post", help="/post (default) or /divoom_api")
     ap.add_argument("--seconds", type=int, default=30, help="seconds per page on the device")
     args = ap.parse_args(argv)

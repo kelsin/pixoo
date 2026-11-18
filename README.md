@@ -41,7 +41,7 @@ Add `--endpoint /divoom_api` if your firmware doesn't answer on `/post`.
 
 ## Letterboxd + hourly update
 
-`retro_pixoo.update` is a one-shot command that builds four pages (RetroAchievements profile, last watched film, recent unlocks, recent diary) and pushes them to the Pixoo. Each page shows for 30 seconds by default (`--seconds`). Letterboxd data comes from the public RSS feed (user `kelsin13` by default, `--lb-user`); RetroAchievements needs `RA_API_KEY` set.
+`retro_pixoo.update` is a one-shot command that builds four pages (RetroAchievements profile, recent unlocks, Letterboxd last watched film, recent diary) and pushes them to the Pixoo. Each page shows for 30 seconds by default (`--seconds`). Letterboxd data comes from the public RSS feed (user `kelsin13` by default, `--lb-user`); RetroAchievements needs `RA_API_KEY` set.
 
 ```bash
 python -m retro_pixoo.update --sample --preview preview     # no network, no device

@@ -1,0 +1,148 @@
+"""Render RetroAchievements data into 64x64 frames for the Pixoo-64.
+
+Two pages:
+  profile_frame - avatar, name, online status, points, rank, last game progress
+  recent_frame  - the three most recent unlocks with their badges
+"""
+
+from __future__ import annotations
+
+import hashlib
+
+from PIL import Image, ImageDraw
+
+from . import font
+from .ra import ImageFetcher, Profile
+
+SIZE = 64
+
+BG = (0, 0, 0)
+WHITE = (235, 235, 235)
+GREY = (110, 115, 125)
+DIM = (45, 48, 56)
+GOLD = (255, 196, 40)
+CYAN = (60, 200, 240)
+GREEN = (60, 210, 90)
+HEADER = (24, 26, 40)
+BAR_BG = (40, 40, 50)
+
+
+def _placeholder(key: str, size: int) -> Image.Image:
+    """A symmetric pixel 'identicon' used when an image can't be downloaded."""
+    h = hashlib.md5(key.encode()).digest()
+    color = (80 + h[0] % 176, 80 + h[1] % 176, 80 + h[2] % 176)
+    cells = 5
+    small = Image.new("RGB", (cells, cells), (20, 20, 28))
+    px = small.load()
+    for y in range(cells):
+        for x in range(3):
+            if (h[3 + y] >> x) & 1:
+                px[x, y] = color
+                px[cells - 1 - x, y] = color
+    return small.resize((size, size), Image.NEAREST)
+
+
+def _icon(fetcher: ImageFetcher, url: str, size: int) -> Image.Image:
+    img = fetcher.get(url)
+    if img is None:
+        return _placeholder(url or "none", size)
+    # Downscale with a smooth filter: badges are 64x64 art, avatars 128x128.
+    return img.resize((size, size), Image.LANCZOS)
+
+
+def _bar(d: ImageDraw.ImageDraw, x: int, y: int, w: int, h: int, frac: float, color) -> None:
+    d.rectangle([x, y, x + w - 1, y + h - 1], fill=BAR_BG)
+    fill = round(w * max(0.0, min(1.0, frac)))
+    if fill:
+        d.rectangle([x, y, x + fill - 1, y + h - 1], fill=color)
+
+
+def _compact(n: int) -> str:
+    if n >= 1_000_000:
+        return f"{n / 1_000_000:.1f}M"
+    if n >= 100_000:
+        return f"{n // 1000}K"
+    return str(n)
+
+
+def profile_frame(p: Profile, fetcher: ImageFetcher) -> Image.Image:
+    img = Image.new("RGB", (SIZE, SIZE), BG)
+    d = ImageDraw.Draw(img)
+
+    # Header: 16x16 avatar, name, status
+    d.rectangle([0, 0, 63, 17], fill=HEADER)
+    img.paste(_icon(fetcher, p.avatar_url, 16), (1, 1))
+    font.draw_text(img, 20, 3, font.fit(p.user, 43), WHITE)
+    online = p.status.lower() == "online"
+    d.rectangle([20, 11, 22, 13], fill=GREEN if online else GREY)
+    font.draw_text(img, 25, 10, "ONLINE" if online else "OFFLINE", GREEN if online else GREY)
+
+    # Points, large
+    font.draw_text(img, 2, 21, "POINTS", GREY)
+    pts = _compact(p.points)
+    scale = 2 if font.text_width(pts, 2) <= 60 else 1
+    font.draw_text(img, 2, 28, pts, GOLD, scale=scale)
+
+    # Rank
+    if p.rank:
+        rank_txt = f"#{p.rank}"
+        font.draw_text(img, 2, 40, font.fit(rank_txt, 34), WHITE)
+        top = p.top_percent
+        if top is not None:
+            pct = f"TOP {top:.0f}%" if top >= 10 else f"TOP {top:.1f}%"
+            font.draw_text(img, 62 - font.text_width(pct), 40, pct, CYAN)
+    else:
+        font.draw_text(img, 2, 40, "UNRANKED", GREY)
+
+    # Last game: icon, title, progress bar
+    d.line([0, 47, 63, 47], fill=DIM)
+    g = p.last_game
+    if g:
+        img.paste(_icon(fetcher, g.icon_url, 14), (1, 49))
+        font.draw_text(img, 17, 50, font.fit(g.title, 46), WHITE)
+        frac = g.achieved / g.possible if g.possible else 0
+        _bar(d, 17, 56, 46, 2, frac, GOLD if frac >= 1 else CYAN)
+        font.draw_text(img, 17, 59, f"{g.achieved}/{g.possible}", GREY)
+        pct = f"{frac * 100:.0f}%"
+        font.draw_text(img, 63 - font.text_width(pct), 59, pct, GOLD if frac >= 1 else CYAN)
+    else:
+        font.draw_text(img, 2, 52, "NO RECENT GAME", GREY)
+    return img
+
+
+def recent_frame(p: Profile, fetcher: ImageFetcher, count: int = 3) -> Image.Image:
+    img = Image.new("RGB", (SIZE, SIZE), BG)
+    d = ImageDraw.Draw(img)
+    d.rectangle([0, 0, 63, 6], fill=HEADER)
+    font.draw_text(img, 2, 1, "RECENT UNLOCKS", GOLD)
+
+    if not p.recent:
+        font.draw_text(img, 2, 28, "NONE YET", GREY)
+        return img
+
+    y = 9
+    for a in p.recent[:count]:
+        # 16x16 badge with a 1px frame: gold for hardcore, grey for softcore
+        frame = GOLD if a.hardcore else GREY
+        d.rectangle([0, y - 1, 17, y + 16], outline=frame)
+        img.paste(_icon(fetcher, a.badge_url, 16), (1, y))
+        lines = font.wrap(a.title, 44, 2)
+        for i, line in enumerate(lines):
+            font.draw_text(img, 20, y + i * 6, line, WHITE)
+        font.draw_text(img, 20, y + 12, f"{a.points} PTS", GOLD if a.hardcore else GREY)
+        y += 19
+    return img
+
+
+def frames(p: Profile, fetcher: ImageFetcher) -> list[Image.Image]:
+    return [profile_frame(p, fetcher), recent_frame(p, fetcher)]
+
+
+def led_preview(frame: Image.Image, scale: int = 8, gap: int = 1) -> Image.Image:
+    """Upscale a 64x64 frame with dark gaps between pixels so it looks like the LED panel."""
+    big = frame.resize((SIZE * scale, SIZE * scale), Image.NEAREST)
+    d = ImageDraw.Draw(big)
+    for i in range(0, SIZE * scale, scale):
+        d.rectangle([i, 0, i + gap - 1, SIZE * scale], fill=(8, 8, 10))
+        d.rectangle([0, i, SIZE * scale, i + gap - 1], fill=(8, 8, 10))
+    return big

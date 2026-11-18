@@ -1,0 +1,73 @@
+{
+  "_note": "SAMPLE DATA for offline layout tests. Not real profile numbers. Shape matches API_GetUserSummary.",
+  "User": "kelsin",
+  "TotalPoints": 12840,
+  "TotalSoftcorePoints": 310,
+  "TotalTruePoints": 31275,
+  "Rank": 4217,
+  "TotalRanked": 98650,
+  "Status": "Online",
+  "UserPic": "/UserPic/kelsin.png",
+  "RichPresenceMsg": "Exploring Brinstar, 3 Energy Tanks",
+  "LastGameID": 1446,
+  "RecentlyPlayed": [
+    {
+      "GameID": "1446",
+      "ConsoleName": "SNES/Super Famicom",
+      "Title": "Super Metroid",
+      "ImageIcon": "/Images/066693.png",
+      "LastPlayed": "2026-11-17 21:04:11",
+      "AchievementsTotal": "60"
+    }
+  ],
+  "Awarded": {
+    "1446": {
+      "NumPossibleAchievements": 60,
+      "PossibleScore": 725,
+      "NumAchieved": 38,
+      "ScoreAchieved": 455,
+      "NumAchievedHardcore": 38,
+      "ScoreAchievedHardcore": 455
+    }
+  },
+  "RecentAchievements": {
+    "1446": {
+      "9001": {
+        "ID": "9001",
+        "GameID": "1446",
+        "GameTitle": "Super Metroid",
+        "Title": "Speed Booster",
+        "Description": "Collect the Speed Booster",
+        "Points": "10",
+        "BadgeName": "00001",
+        "IsAwarded": "1",
+        "DateAwarded": "2026-11-17 20:51:02",
+        "HardcoreAchieved": "1"
+      },
+      "9002": {
+        "ID": "9002",
+        "GameID": "1446",
+        "GameTitle": "Super Metroid",
+        "Title": "Kraid Down",
+        "Description": "Defeat Kraid",
+        "Points": "25",
+        "BadgeName": "00002",
+        "IsAwarded": "1",
+        "DateAwarded": "2026-11-17 20:12:40",
+        "HardcoreAchieved": "1"
+      },
+      "9003": {
+        "ID": "9003",
+        "GameID": "1446",
+        "GameTitle": "Super Metroid",
+        "Title": "Energy Hoarder",
+        "Description": "Hold 5 Energy Tanks",
+        "Points": "5",
+        "BadgeName": "00003",
+        "IsAwarded": "1",
+        "DateAwarded": "2026-11-16 22:30:00",
+        "HardcoreAchieved": "0"
+      }
+    }
+  }
+}

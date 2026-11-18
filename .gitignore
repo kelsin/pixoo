@@ -4,3 +4,5 @@ __pycache__/
 .env
 preview/*.gif
 *.bundle
+dist/
+.pytest_cache/

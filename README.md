@@ -1,69 +1,47 @@
 # retro_pixoo
 
-Shows your RetroAchievements profile on a Divoom Pixoo-64 as two looping pages:
+Puts your RetroAchievements profile and Letterboxd diary on a Divoom Pixoo-64.
 
-1. **Profile**: avatar, username, online status, points, rank and top %, and progress in your last played game.
-2. **Recent unlocks**: your three newest achievements with badges. Hardcore unlocks get a gold frame.
+## Quick start
 
-## Setup
+Needs [uv](https://docs.astral.sh/uv/getting-started/installation/) (`brew install uv`).
 
 ```bash
-pip install requests pillow
+git clone git@github.com:kelsin/pixoo.git && cd pixoo
+uv sync
+uv run retro-pixoo-update --sample --preview preview
 ```
 
-Get your Web API key from https://retroachievements.org/settings (the Keys / Authentication section). Keep it secret.
+That renders every page from bundled sample data into `preview/`, with no network or device needed.
+
+## Live data
+
+Get a Web API key from https://retroachievements.org/settings (Keys / Authentication), then push to your Pixoo:
 
 ```bash
 export RA_API_KEY=your_key_here
+uv run retro-pixoo-update --send 192.168.1.50
 ```
 
-## Run
+## Commands
 
-Preview with bundled sample data (no network, no device needed):
+| Command | What it does |
+| --- | --- |
+| `retro-pixoo-update` | One shot: RA profile, recent unlocks, Letterboxd last watched film, recent diary. 30s per page (`--seconds`). |
+| `retro-pixoo` | RA profile and recent unlocks only. `--loop MIN` keeps refreshing (minimum 5). |
 
-```bash
-python -m retro_pixoo --sample --preview preview
-```
+Common flags: `--sample`, `--preview DIR`, `--send IP`, `--endpoint /divoom_api` (if your firmware doesn't answer on `/post`). Users: `--ra-user` and `--lb-user` for `retro-pixoo-update`, `--user` for `retro-pixoo`.
 
-Live data, preview only:
-
-```bash
-python -m retro_pixoo --user kelsin --preview preview
-```
-
-Push to the Pixoo, refreshing every 10 minutes:
-
-```bash
-python -m retro_pixoo --user kelsin --send 192.168.1.50 --loop 10
-```
-
-Add `--endpoint /divoom_api` if your firmware doesn't answer on `/post`.
-
-## Letterboxd + hourly update
-
-`retro_pixoo.update` is a one-shot command that builds four pages (RetroAchievements profile, recent unlocks, Letterboxd last watched film, recent diary) and pushes them to the Pixoo. Each page shows for 30 seconds by default (`--seconds`). Letterboxd data comes from the public RSS feed (user `kelsin13` by default, `--lb-user`); RetroAchievements needs `RA_API_KEY` set.
-
-```bash
-python -m retro_pixoo.update --sample --preview preview     # no network, no device
-python -m retro_pixoo.update --send 192.168.1.50
-```
-
-If one source fails (for example `RA_API_KEY` is missing), its pages are skipped and the other source's two pages are still shown. Exit codes: 0 all good, 1 if any source failed or no pages could be built (nothing is sent when there are no pages).
-
-To run it every hour, see the next section.
+If one source fails, `retro-pixoo-update` still shows the other source's pages and exits 1.
 
 ## Run every hour on a Mac
 
-Run `retro_pixoo.update` from a launchd agent rather than cron or `--loop`: launchd starts it at login, catches up after sleep, and each run is a fresh process, so one failure can't wedge the next hour.
+Run `retro-pixoo-update` from a launchd agent rather than cron or `--loop`: launchd starts it at login, catches up after sleep, and each run is a fresh process, so one failure can't wedge the next hour.
 
-**1. Make a virtualenv** in the repo (`.venv/` is gitignored), so the job doesn't depend on your shell's Python or pyenv shims:
-
-```bash
-python3 -m venv .venv
-```
+**1. Install into the repo's `.venv/`** (gitignored), so the job doesn't depend on your shell's Python or pyenv shims:
 
 ```bash
-.venv/bin/pip install -r requirements.txt
+uv sync
 ```
 
 **2. Store the API key in the login Keychain.** launchd doesn't read your shell profile, and this keeps the key out of the plist. The command prompts for the key, so it doesn't land in shell history:
@@ -131,22 +109,12 @@ After editing the plist, run `bootout` then `bootstrap` again to pick up the cha
 
 - The agent only runs while you're logged in, which is what you want for a desk display. If the Mac is asleep, launchd runs one catch-up update on wake instead of one per missed hour.
 - Keep the repo out of `~/Documents`, `~/Desktop` and `~/Downloads`. macOS privacy protection blocks background jobs from reading those folders, and the job fails with `Operation not permitted`.
-- If you move the repo or recreate `.venv`, rerun step 4 and reload.
+- If you move the repo or delete `.venv`, rerun step 4 and reload.
 
-## Use from your own script
+## Development
 
-```python
-from retro_pixoo import RAClient, ImageFetcher, Pixoo, frames, profile_frame
-
-profile = RAClient().profile("kelsin")
-pages = frames(profile, ImageFetcher())          # list of 64x64 PIL images
-Pixoo("192.168.1.50").show(pages, ms_per_frame=6000)
+```bash
+uv run pytest
 ```
 
-Each page is a plain 64x64 `PIL.Image`, so you can mix these pages with your own frames in one `show()` call (up to about 40 frames).
-
-## Notes
-
-- One API call per refresh (`API_GetUserSummary`). RetroAchievements asks clients to cache and rate-limits fast polling, so the loop refuses intervals under 5 minutes.
-- If a badge or avatar fails to download, a generated pixel placeholder is drawn instead.
-- `retro_pixoo/sample_summary.json` is made-up data in the API's shape, for layout testing only.
+Every page is a 64x64 `PIL.Image`, so you can build your own frames and send them with `Pixoo("192.168.1.50").show(pages)`. The sample files in `retro_pixoo/` are made-up data for layout testing.

@@ -44,8 +44,10 @@ class UpdateTests(unittest.TestCase):
         self.assertEqual(len(errors), 2)
 
     def test_main_sample_preview(self):
-        with tempfile.TemporaryDirectory() as d:
-            self.assertEqual(main(["--sample", "--preview", d]), 0)
+        with tempfile.TemporaryDirectory() as d, \
+             mock.patch("retro_pixoo.update.Pixoo") as pixoo:
+            self.assertEqual(main(["--sample", "--preview", d, "--send", ""]), 0)
+            pixoo.assert_not_called()
             self.assertTrue((Path(d) / "preview.gif").exists())
             self.assertTrue((Path(d) / "page4_led.png").exists())
 
@@ -63,6 +65,12 @@ class UpdateTests(unittest.TestCase):
              mock.patch("sys.stderr", new_callable=io.StringIO) as err:
             self.assertEqual(main(["--sample", "--send", "1.2.3.4"]), 1)
         self.assertIn("pixoo: down", err.getvalue())
+
+    def test_main_send_defaults_to_pixoo_ip_env(self):
+        with mock.patch.dict("os.environ", {"PIXOO_IP": "5.6.7.8"}), \
+             mock.patch("retro_pixoo.update.Pixoo") as pixoo:
+            self.assertEqual(main(["--sample"]), 0)
+        pixoo.assert_called_once_with("5.6.7.8", "/post")
 
     def test_empty_exception_message_uses_type_name(self):
         def lb():

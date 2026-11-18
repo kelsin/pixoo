@@ -20,7 +20,8 @@ Get a Web API key from https://retroachievements.org/settings (Keys / Authentica
 
 ```bash
 export RA_API_KEY=your_key_here
-uv run retro-pixoo-update --send 192.168.1.50
+export PIXOO_IP=192.168.1.50
+uv run retro-pixoo-update
 ```
 
 ## Commands
@@ -30,7 +31,7 @@ uv run retro-pixoo-update --send 192.168.1.50
 | `retro-pixoo-update` | One shot: RA profile, recent unlocks, Letterboxd last watched film, recent diary. 30s per page (`--seconds`). |
 | `retro-pixoo` | RA profile and recent unlocks only. `--loop MIN` keeps refreshing (minimum 5). |
 
-Common flags: `--sample`, `--preview DIR`, `--send IP`, `--endpoint /divoom_api` (if your firmware doesn't answer on `/post`). Users: `--ra-user` and `--lb-user` for `retro-pixoo-update`, `--user` for `retro-pixoo`.
+Common flags: `--sample`, `--preview DIR`, `--send IP` (defaults to `$PIXOO_IP`), `--endpoint /divoom_api` (if your firmware doesn't answer on `/post`). Users: `--ra-user` and `--lb-user` for `retro-pixoo-update`, `--user` for `retro-pixoo`.
 
 If one source fails, `retro-pixoo-update` still shows the other source's pages and exits 1.
 
@@ -70,7 +71,7 @@ cat > ~/Library/LaunchAgents/com.retro-pixoo.hourly.plist <<EOF
   <array>
     <string>/bin/zsh</string>
     <string>-c</string>
-    <string>RA_API_KEY="\$(security find-generic-password -s retro_pixoo -a \$USER -w)" exec .venv/bin/python -u -m retro_pixoo.update --ra-user $RA_USER --lb-user $LB_USER --send $PIXOO_IP</string>
+    <string>RA_API_KEY="\$(security find-generic-password -s retro_pixoo -a \$USER -w)" PIXOO_IP=$PIXOO_IP exec .venv/bin/python -u -m retro_pixoo.update --ra-user $RA_USER --lb-user $LB_USER</string>
   </array>
   <key>StartInterval</key><integer>3600</integer>
   <key>RunAtLoad</key><true/>

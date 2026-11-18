@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import time
 from pathlib import Path
 
@@ -16,7 +17,8 @@ def main() -> None:
     ap.add_argument("--user", default="kelsin")
     ap.add_argument("--sample", action="store_true", help="use bundled sample data, no network")
     ap.add_argument("--preview", type=Path, help="write PNG/GIF previews to this directory")
-    ap.add_argument("--send", metavar="IP", help="push frames to the Pixoo at this IP")
+    ap.add_argument("--send", metavar="IP", default=os.environ.get("PIXOO_IP"),
+                    help="push frames to the Pixoo at this IP (default: $PIXOO_IP)")
     ap.add_argument("--endpoint", default="/post", help="/post (default) or /divoom_api")
     ap.add_argument("--seconds", type=int, default=6, help="seconds per page on the device")
     ap.add_argument("--loop", type=float, metavar="MIN", help="refresh every MIN minutes (keep >= 5)")

@@ -52,7 +52,7 @@ class Profile:
     true_points: int
     rank: int | None
     total_ranked: int | None
-    status: str
+    member_since: str
     avatar_url: str
     rich_presence: str
     last_game: GameProgress | None
@@ -122,7 +122,7 @@ def parse_summary(data: dict[str, Any]) -> Profile:
         true_points=_int(data.get("TotalTruePoints")),
         rank=_int(rank) if rank is not None else None,
         total_ranked=_int(total) if total is not None else None,
-        status=data.get("Status", "Offline"),
+        member_since=data.get("MemberSince", "") or "",
         avatar_url=_media(data.get("UserPic")),
         rich_presence=data.get("RichPresenceMsg", "") or "",
         last_game=last_game,

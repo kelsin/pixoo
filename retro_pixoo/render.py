@@ -1,7 +1,7 @@
 """Render RetroAchievements and Letterboxd data into 64x64 frames for the Pixoo-64.
 
 Pages:
-  profile_frame      - avatar, name, online status, points, rank, last game progress
+  profile_frame      - avatar, name, member-since year, points, rank, last game progress
   recent_frame       - the three most recent unlocks with their badges
   last_watched_frame - latest Letterboxd diary film: poster, title, year, rating
   diary_frame        - the next four diary films as small posters with ratings
@@ -26,7 +26,6 @@ GREY = (110, 115, 125)
 DIM = (45, 48, 56)
 GOLD = (255, 196, 40)
 CYAN = (60, 200, 240)
-GREEN = (60, 210, 90)
 HEADER = (24, 26, 40)
 BAR_BG = (40, 40, 50)
 RED = (230, 60, 80)
@@ -77,13 +76,13 @@ def profile_frame(p: Profile, fetcher: ImageFetcher) -> Image.Image:
     img = Image.new("RGB", (SIZE, SIZE), BG)
     d = ImageDraw.Draw(img)
 
-    # Header: 16x16 avatar, name, status
+    # Header: 16x16 avatar, name, member-since year
     d.rectangle([0, 0, 63, 17], fill=HEADER)
     img.paste(_icon(fetcher, p.avatar_url, 16), (1, 1))
     font.draw_text(img, 20, 3, font.fit(p.user, 43), WHITE)
-    online = p.status.lower() == "online"
-    d.rectangle([20, 11, 22, 13], fill=GREEN if online else GREY)
-    font.draw_text(img, 25, 10, "ONLINE" if online else "OFFLINE", GREEN if online else GREY)
+    year = p.member_since[:4]
+    if len(year) == 4 and year.isdigit():
+        font.draw_text(img, 20, 10, f"SINCE {year}", GREY)
 
     # Points, large
     font.draw_text(img, 2, 21, "POINTS", GREY)
@@ -100,7 +99,8 @@ def profile_frame(p: Profile, fetcher: ImageFetcher) -> Image.Image:
             pct = f"TOP {top:.0f}%" if top >= 10 else f"TOP {top:.1f}%"
             font.draw_text(img, 62 - font.text_width(pct), 40, pct, CYAN)
     else:
-        font.draw_text(img, 2, 40, "UNRANKED", GREY)
+        softcore = p.points == 0 and p.softcore_points > 0
+        font.draw_text(img, 2, 40, "SOFTCORE" if softcore else "UNRANKED", GREY)
 
     # Last game: icon, title, progress bar
     d.line([0, 47, 63, 47], fill=DIM)

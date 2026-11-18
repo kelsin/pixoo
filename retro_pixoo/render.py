@@ -33,6 +33,7 @@ RED = (230, 60, 80)
 
 _STAR = ("..#..", ".###.", "#####", ".###.", ".#.#.")
 _HEART = (".#.#.", "#####", "#####", ".###.", "..#..")
+_REWATCH = (".###.#", "#...##", "#..###", "#.....", ".####.")
 
 
 def _placeholder(key: str, size: int) -> Image.Image:
@@ -232,7 +233,7 @@ def last_watched_frame(entries: list[DiaryEntry], fetcher: ImageFetcher) -> Imag
         _glyph(img, x, y + 1, _HEART, RED)
         x += 7
     if e.rewatch:
-        font.draw_text(img, x, y + 1, "RE", CYAN)
+        _glyph(img, x, y + 1, _REWATCH, CYAN)
     when = _watched_date(e.watched_date)
     if when:
         font.draw_text(img, 1, 56, f"WATCHED {when}", GREY)

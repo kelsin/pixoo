@@ -1,7 +1,7 @@
 """Render RetroAchievements and Letterboxd data into 64x64 frames for the Pixoo-64.
 
 Pages:
-  profile_frame      - avatar, name, online status, points, rank, last game progress
+  profile_frame      - avatar, name, time since last played, points, rank, last game progress
   recent_frame       - the three most recent unlocks with their badges
   last_watched_frame - latest Letterboxd diary film: poster, title, year, rating
   diary_frame        - the next four diary films as small posters with ratings
@@ -10,7 +10,7 @@ Pages:
 from __future__ import annotations
 
 import hashlib
-from datetime import date
+from datetime import date, datetime, timezone
 
 from PIL import Image, ImageDraw
 
@@ -26,7 +26,6 @@ GREY = (110, 115, 125)
 DIM = (45, 48, 56)
 GOLD = (255, 196, 40)
 CYAN = (60, 200, 240)
-GREEN = (60, 210, 90)
 HEADER = (24, 26, 40)
 BAR_BG = (40, 40, 50)
 RED = (230, 60, 80)
@@ -73,17 +72,33 @@ def _compact(n: int) -> str:
     return str(n)
 
 
-def profile_frame(p: Profile, fetcher: ImageFetcher) -> Image.Image:
+def _played_ago(ts: str, now: datetime) -> str | None:
+    """'2026-11-17 21:04:11' (UTC) -> '2H AGO'; None if it can't be parsed."""
+    try:
+        then = datetime.strptime(ts, "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
+    except ValueError:
+        return None
+    secs = int((now - then).total_seconds())
+    if secs < 60:
+        return "JUST NOW"
+    if secs < 3600:
+        return f"{secs // 60}M AGO"
+    if secs < 86400:
+        return f"{secs // 3600}H AGO"
+    return f"{secs // 86400}D AGO"
+
+
+def profile_frame(p: Profile, fetcher: ImageFetcher, now: datetime | None = None) -> Image.Image:
     img = Image.new("RGB", (SIZE, SIZE), BG)
     d = ImageDraw.Draw(img)
 
-    # Header: 16x16 avatar, name, status
+    # Header: 16x16 avatar, name, time since last played
     d.rectangle([0, 0, 63, 17], fill=HEADER)
     img.paste(_icon(fetcher, p.avatar_url, 16), (1, 1))
     font.draw_text(img, 20, 3, font.fit(p.user, 43), WHITE)
-    online = p.status.lower() == "online"
-    d.rectangle([20, 11, 22, 13], fill=GREEN if online else GREY)
-    font.draw_text(img, 25, 10, "ONLINE" if online else "OFFLINE", GREEN if online else GREY)
+    ago = _played_ago(p.last_played, now or datetime.now(timezone.utc))
+    if ago:
+        font.draw_text(img, 20, 10, ago, GREY)
 
     # Points, large
     font.draw_text(img, 2, 21, "POINTS", GREY)

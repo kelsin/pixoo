@@ -45,6 +45,14 @@ class GameProgress:
 
 
 @dataclass
+class SystemStat:
+    console: str
+    games: int
+    achievements: int
+    icon_url: str
+
+
+@dataclass
 class Profile:
     user: str
     points: int
@@ -57,6 +65,7 @@ class Profile:
     rich_presence: str
     last_game: GameProgress | None
     recent: list[Achievement] = field(default_factory=list)
+    systems: list[SystemStat] = field(default_factory=list)
 
     @property
     def top_percent(self) -> float | None:
@@ -76,6 +85,24 @@ def _media(path: str | None) -> str:
     if not path:
         return ""
     return path if path.startswith("http") else MEDIA_BASE + path
+
+
+def top_systems(played: list[dict[str, Any]], awarded: dict[str, Any], limit: int = 4) -> list[SystemStat]:
+    """Rank consoles by number of recently played games.
+
+    `played` is newest first, so the first game seen per console supplies its
+    icon, and the stable sort breaks ties in favor of the most recent console.
+    """
+    stats: dict[str, SystemStat] = {}
+    for g in played:
+        console = g.get("ConsoleName", "")
+        prog = awarded.get(str(_int(g.get("GameID")))) or {}
+        achieved = _int(prog.get("NumAchievedHardcore")) or _int(prog.get("NumAchieved"))
+        if console not in stats:
+            stats[console] = SystemStat(console, 0, 0, _media(g.get("ImageIcon")))
+        stats[console].games += 1
+        stats[console].achievements += achieved
+    return sorted(stats.values(), key=lambda s: -s.games)[:limit]
 
 
 def parse_summary(data: dict[str, Any]) -> Profile:
@@ -127,6 +154,7 @@ def parse_summary(data: dict[str, Any]) -> Profile:
         rich_presence=data.get("RichPresenceMsg", "") or "",
         last_game=last_game,
         recent=recent,
+        systems=top_systems(played, awarded),
     )
 
 
@@ -149,7 +177,7 @@ class RAClient:
         return self._get("API_GetUserSummary.php", u=user, g=games, a=achievements)
 
     def profile(self, user: str, achievements: int = 5) -> Profile:
-        return parse_summary(self.user_summary(user, achievements=achievements))
+        return parse_summary(self.user_summary(user, games=100, achievements=achievements))
 
 
 def load_sample() -> Profile:

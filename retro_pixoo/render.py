@@ -5,6 +5,7 @@ Pages:
   recent_frame       - the three most recent unlocks with their badges
   last_watched_frame - latest Letterboxd diary film: poster, title, year, rating
   diary_frame        - the next four diary films as small posters with ratings
+  systems_frame      - top four RetroAchievements systems by recently played games
 """
 
 from __future__ import annotations
@@ -260,8 +261,72 @@ def diary_frame(entries: list[DiaryEntry], fetcher: ImageFetcher, count: int = 4
     return img
 
 
+_SYSTEM_TAGS: dict[str, tuple[str, tuple[int, int, int]]] = {
+    "NES/Famicom": ("NES", (230, 70, 70)),
+    "SNES/Super Famicom": ("SNES", (170, 140, 230)),
+    "Nintendo 64": ("N64", (80, 200, 110)),
+    "GameCube": ("GC", (150, 120, 240)),
+    "Game Boy": ("GB", (150, 200, 90)),
+    "Game Boy Color": ("GBC", (240, 130, 200)),
+    "Game Boy Advance": ("GBA", (110, 140, 240)),
+    "Nintendo DS": ("DS", (200, 205, 215)),
+    "Genesis/Mega Drive": ("GEN", (70, 130, 240)),
+    "Master System": ("SMS", (240, 90, 90)),
+    "Saturn": ("SAT", (90, 190, 220)),
+    "Dreamcast": ("DC", (240, 150, 60)),
+    "Game Gear": ("GG", (80, 120, 220)),
+    "PlayStation": ("PS1", (200, 205, 215)),
+    "PlayStation 2": ("PS2", (90, 150, 240)),
+    "PlayStation Portable": ("PSP", (130, 140, 230)),
+    "PC Engine/TurboGrafx-16": ("PCE", (240, 170, 60)),
+    "Atari 2600": ("2600", (230, 140, 70)),
+    "Arcade": ("ARC", (240, 210, 70)),
+    "Sega CD": ("SCD", (120, 170, 240)),
+    "32X": ("32X", (240, 120, 120)),
+    "PC Engine CD/TurboGrafx-CD": ("PCCD", (240, 190, 90)),
+    "Atari 7800": ("7800", (230, 150, 100)),
+    "Atari Lynx": ("LYNX", (240, 180, 80)),
+    "Atari Jaguar": ("JAG", (230, 90, 90)),
+    "Virtual Boy": ("VB", (240, 80, 80)),
+    "Nintendo DSi": ("DSI", (110, 210, 230)),
+    "Neo Geo Pocket": ("NGP", (200, 160, 240)),
+    "WonderSwan": ("WS", (120, 200, 200)),
+    "MSX": ("MSX", (150, 210, 130)),
+}
+
+
+def system_tag(console: str) -> tuple[str, tuple[int, int, int]]:
+    """Short label and color for an RA console name; unknown consoles get grey and the first 4 letters/digits."""
+    return _SYSTEM_TAGS.get(console) or ("".join(c for c in console if c.isalnum())[:4].upper(), GREY)
+
+
+def systems_frame(p: Profile, fetcher: ImageFetcher) -> Image.Image:
+    img = Image.new("RGB", (SIZE, SIZE), BG)
+    d = ImageDraw.Draw(img)
+    _header(img, "TOP SYSTEMS")
+    if not p.systems:
+        font.draw_text(img, 2, 28, "NO GAMES", GREY)
+        return img
+
+    for i, s in enumerate(p.systems[:4]):
+        x, y = (i % 2) * 32, 8 + (i // 2) * 28
+        img.paste(_icon(fetcher, s.icon_url, 16), (x + 1, y + 1))
+
+        n = str(s.games)
+        scale, ny = (2, y + 4) if font.text_width(n, 2) <= 14 else (1, y + 7)
+        font.draw_text(img, x + 18 + (14 - font.text_width(n, scale)) // 2, ny, n, WHITE, scale=scale)
+
+        tag, color = system_tag(s.console)
+        d.rectangle([x + 1, y + 19, x + 16, y + 25], fill=color)
+        font.draw_text(img, x + 1 + (16 - font.text_width(tag)) // 2 + 1, y + 20, tag, BG)
+
+        ach = str(s.achievements) if s.achievements < 1000 else f"{s.achievements // 1000}K"
+        font.draw_text(img, x + 19, y + 20, ach, GOLD)
+    return img
+
+
 def frames(p: Profile, fetcher: ImageFetcher) -> list[Image.Image]:
-    return [profile_frame(p, fetcher), recent_frame(p, fetcher)]
+    return [profile_frame(p, fetcher), recent_frame(p, fetcher), systems_frame(p, fetcher)]
 
 
 def led_preview(frame: Image.Image, scale: int = 8, gap: int = 1) -> Image.Image:

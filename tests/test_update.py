@@ -6,7 +6,8 @@ from unittest import mock
 
 from retro_pixoo.letterboxd import load_sample_feed
 from retro_pixoo.ra import ImageFetcher, load_sample
-from retro_pixoo.render import diary_frame, last_watched_frame, profile_frame, recent_frame
+from retro_pixoo.render import diary_frame, last_watched_frame, profile_frame, recent_frame, systems_frame
+from retro_pixoo import render
 from retro_pixoo.update import collect_pages, main
 
 
@@ -24,13 +25,17 @@ class UpdateTests(unittest.TestCase):
         p, e = load_sample(), load_sample_feed()
         pages, errors = collect_pages(lambda: p, lambda: e, self.fetcher)
         self.assertEqual(errors, [])
-        self.assertEqual(len(pages), 4)
+        self.assertEqual(len(pages), 5)
         expected = [
             profile_frame(p, self.fetcher), recent_frame(p, self.fetcher),
+            systems_frame(p, self.fetcher),
             last_watched_frame(e, self.fetcher), diary_frame(e, self.fetcher),
         ]
         for got, want in zip(pages, expected):
             self.assertEqual(got.tobytes(), want.tobytes())
+
+    def test_frames_has_three_ra_pages(self):
+        self.assertEqual(len(render.frames(load_sample(), self.fetcher)), 3)
 
     def test_ra_failure_keeps_letterboxd(self):
         e = load_sample_feed()
@@ -49,7 +54,7 @@ class UpdateTests(unittest.TestCase):
             self.assertEqual(main(["--sample", "--preview", d, "--send", ""]), 0)
             pixoo.assert_not_called()
             self.assertTrue((Path(d) / "preview.gif").exists())
-            self.assertTrue((Path(d) / "page4_led.png").exists())
+            self.assertTrue((Path(d) / "page5_led.png").exists())
 
     def test_main_no_pages_does_not_send(self):
         with mock.patch("retro_pixoo.update.RAClient", side_effect=RuntimeError("x")), \

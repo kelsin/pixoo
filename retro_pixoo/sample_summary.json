@@ -17,6 +17,110 @@
       "ImageIcon": "/Images/066693.png",
       "LastPlayed": "2026-11-17 21:04:11",
       "AchievementsTotal": "60"
+    },
+    {
+      "GameID": "22801",
+      "ConsoleName": "SNES/Super Famicom",
+      "Title": "Chrono Trigger",
+      "ImageIcon": "/Images/022801.png",
+      "LastPlayed": "2026-11-17 18:30:02",
+      "AchievementsTotal": "57"
+    },
+    {
+      "GameID": "325701",
+      "ConsoleName": "Game Boy Advance",
+      "Title": "Metroid Fusion",
+      "ImageIcon": "/Images/325701.png",
+      "LastPlayed": "2026-11-16 19:12:44",
+      "AchievementsTotal": "42"
+    },
+    {
+      "GameID": "120901",
+      "ConsoleName": "PlayStation",
+      "Title": "Castlevania: Symphony of the Night",
+      "ImageIcon": "/Images/120901.png",
+      "LastPlayed": "2026-11-15 22:01:09",
+      "AchievementsTotal": "58"
+    },
+    {
+      "GameID": "142301",
+      "ConsoleName": "SNES/Super Famicom",
+      "Title": "F-Zero",
+      "ImageIcon": "/Images/142301.png",
+      "LastPlayed": "2026-11-14 20:15:31",
+      "AchievementsTotal": "40"
+    },
+    {
+      "GameID": "156001",
+      "ConsoleName": "Nintendo 64",
+      "Title": "The Legend of Zelda: Ocarina of Time",
+      "ImageIcon": "/Images/156001.png",
+      "LastPlayed": "2026-11-13 21:44:50",
+      "AchievementsTotal": "63"
+    },
+    {
+      "GameID": "311401",
+      "ConsoleName": "Game Boy Advance",
+      "Title": "Advance Wars",
+      "ImageIcon": "/Images/311401.png",
+      "LastPlayed": "2026-11-12 17:05:27",
+      "AchievementsTotal": "48"
+    },
+    {
+      "GameID": "22901",
+      "ConsoleName": "SNES/Super Famicom",
+      "Title": "Super Mario World",
+      "ImageIcon": "/Images/022901.png",
+      "LastPlayed": "2026-11-11 19:48:16",
+      "AchievementsTotal": "75"
+    },
+    {
+      "GameID": "121401",
+      "ConsoleName": "PlayStation",
+      "Title": "Final Fantasy VII",
+      "ImageIcon": "/Images/121401.png",
+      "LastPlayed": "2026-11-10 20:30:00",
+      "AchievementsTotal": "51"
+    },
+    {
+      "GameID": "131201",
+      "ConsoleName": "Genesis/Mega Drive",
+      "Title": "Sonic the Hedgehog 2",
+      "ImageIcon": "/Images/131201.png",
+      "LastPlayed": "2026-11-09 18:22:41",
+      "AchievementsTotal": "36"
+    },
+    {
+      "GameID": "310101",
+      "ConsoleName": "Game Boy Advance",
+      "Title": "Golden Sun",
+      "ImageIcon": "/Images/310101.png",
+      "LastPlayed": "2026-11-08 21:09:33",
+      "AchievementsTotal": "44"
+    },
+    {
+      "GameID": "118701",
+      "ConsoleName": "SNES/Super Famicom",
+      "Title": "EarthBound",
+      "ImageIcon": "/Images/118701.png",
+      "LastPlayed": "2026-11-07 19:55:12",
+      "AchievementsTotal": "33"
+    },
+    {
+      "GameID": "147001",
+      "ConsoleName": "Nintendo 64",
+      "Title": "Super Mario 64",
+      "ImageIcon": "/Images/147001.png",
+      "LastPlayed": "2026-11-06 20:41:05",
+      "AchievementsTotal": "45"
+    },
+    {
+      "GameID": "119001",
+      "ConsoleName": "PlayStation",
+      "Title": "Crash Bandicoot",
+      "ImageIcon": "/Images/119001.png",
+      "LastPlayed": "2026-11-05 22:17:48",
+      "AchievementsTotal": "30"
     }
   ],
   "Awarded": {
@@ -27,6 +131,102 @@
       "ScoreAchieved": 455,
       "NumAchievedHardcore": 38,
       "ScoreAchievedHardcore": 455
+    },
+    "22801": {
+      "NumPossibleAchievements": 57,
+      "PossibleScore": 570,
+      "NumAchieved": 31,
+      "ScoreAchieved": 310,
+      "NumAchievedHardcore": 31,
+      "ScoreAchievedHardcore": 310
+    },
+    "325701": {
+      "NumPossibleAchievements": 42,
+      "PossibleScore": 420,
+      "NumAchieved": 42,
+      "ScoreAchieved": 420,
+      "NumAchievedHardcore": 42,
+      "ScoreAchievedHardcore": 420
+    },
+    "120901": {
+      "NumPossibleAchievements": 58,
+      "PossibleScore": 580,
+      "NumAchieved": 12,
+      "ScoreAchieved": 120,
+      "NumAchievedHardcore": 12,
+      "ScoreAchievedHardcore": 120
+    },
+    "156001": {
+      "NumPossibleAchievements": 63,
+      "PossibleScore": 630,
+      "NumAchieved": 20,
+      "ScoreAchieved": 200,
+      "NumAchievedHardcore": 20,
+      "ScoreAchievedHardcore": 200
+    },
+    "311401": {
+      "NumPossibleAchievements": 48,
+      "PossibleScore": 480,
+      "NumAchieved": 15,
+      "ScoreAchieved": 150,
+      "NumAchievedHardcore": 15,
+      "ScoreAchievedHardcore": 150
+    },
+    "22901": {
+      "NumPossibleAchievements": 75,
+      "PossibleScore": 750,
+      "NumAchieved": 40,
+      "ScoreAchieved": 400,
+      "NumAchievedHardcore": 40,
+      "ScoreAchievedHardcore": 400
+    },
+    "121401": {
+      "NumPossibleAchievements": 51,
+      "PossibleScore": 510,
+      "NumAchieved": 9,
+      "ScoreAchieved": 90,
+      "NumAchievedHardcore": 9,
+      "ScoreAchievedHardcore": 90
+    },
+    "131201": {
+      "NumPossibleAchievements": 36,
+      "PossibleScore": 360,
+      "NumAchieved": 22,
+      "ScoreAchieved": 220,
+      "NumAchievedHardcore": 22,
+      "ScoreAchievedHardcore": 220
+    },
+    "310101": {
+      "NumPossibleAchievements": 44,
+      "PossibleScore": 440,
+      "NumAchieved": 6,
+      "ScoreAchieved": 60,
+      "NumAchievedHardcore": 6,
+      "ScoreAchievedHardcore": 60
+    },
+    "118701": {
+      "NumPossibleAchievements": 33,
+      "PossibleScore": 330,
+      "NumAchieved": 14,
+      "ScoreAchieved": 140,
+      "NumAchievedHardcore": 14,
+      "ScoreAchievedHardcore": 140
+    },
+    "147001": {
+      "NumPossibleAchievements": 45,
+      "PossibleScore": 450,
+      "NumAchieved": 11,
+      "ScoreAchieved": 110,
+      "NumAchievedHardcore": 11,
+      "ScoreAchievedHardcore": 110
+    },
+    "119001": {
+      "NumPossibleAchievements": 30,
+      "PossibleScore": 300,
+      "NumAchieved": 5,
+      "ScoreAchieved": 50,
+      "NumAchievedHardcore": 5,
+      "ScoreAchievedHardcore": 50
     }
   },
   "RecentAchievements": {

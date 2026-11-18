@@ -16,7 +16,7 @@ from PIL import Image
 from .letterboxd import DiaryEntry, LetterboxdClient, load_sample_feed
 from .pixoo import Pixoo
 from .ra import ImageFetcher, Profile, RAClient, load_sample
-from .render import diary_frame, last_watched_frame, led_preview, profile_frame, recent_frame
+from .render import diary_frame, last_watched_frame, led_preview, profile_frame, recent_frame, systems_frame
 
 
 def collect_pages(
@@ -38,6 +38,7 @@ def collect_pages(
     if profile is not None:
         pages.append(profile_frame(profile, fetcher))
         pages.append(recent_frame(profile, fetcher))
+        pages.append(systems_frame(profile, fetcher))
     if entries is not None:
         pages.append(last_watched_frame(entries, fetcher))
         pages.append(diary_frame(entries, fetcher))

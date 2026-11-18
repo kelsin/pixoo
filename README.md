@@ -28,8 +28,8 @@ uv run retro-pixoo-update
 
 | Command | What it does |
 | --- | --- |
-| `retro-pixoo-update` | One shot: RA profile, recent unlocks, Letterboxd last watched film, recent diary. 30s per page (`--seconds`). |
-| `retro-pixoo` | RA profile and recent unlocks only. `--loop MIN` keeps refreshing (minimum 5). |
+| `retro-pixoo-update` | One shot: RA profile, recent unlocks, top systems, Letterboxd last watched film, recent diary. 30s per page (`--seconds`). |
+| `retro-pixoo` | RA profile, recent unlocks and top systems only. `--loop MIN` keeps refreshing (minimum 5). |
 
 Common flags: `--sample`, `--preview DIR`, `--send IP` (defaults to `$PIXOO_IP`), `--endpoint /divoom_api` (if your firmware doesn't answer on `/post`). Users: `--ra-user` and `--lb-user` for `retro-pixoo-update`, `--user` for `retro-pixoo`.
 
@@ -94,7 +94,7 @@ launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.retro-pixoo.hourly.p
 tail -f ~/Library/Logs/retro-pixoo.log
 ```
 
-A good run logs `sent 4 pages to <ip>`; a failing source logs its error and the job exits 1, which `launchctl print` shows as the last exit code. If macOS shows a Keychain prompt for `security` on the first run, choose **Always Allow**.
+A good run logs `sent 5 pages to <ip>`; a failing source logs its error and the job exits 1, which `launchctl print` shows as the last exit code. If macOS shows a Keychain prompt for `security` on the first run, choose **Always Allow**.
 
 **Manage it:**
 

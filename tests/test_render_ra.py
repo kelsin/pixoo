@@ -60,14 +60,10 @@ class ProfileFrameTests(unittest.TestCase):
         base.paste((0, 0, 0), RANK_BOX)
         return img, base
 
-    def test_softcore_label(self):
-        img, base = self._rank_case(points=0, softcore_points=140)
-        self.assertEqual(_region(img, RANK_BOX), _expected(base, 2, 40, "SOFTCORE", RANK_BOX))
-
     def test_unranked_label(self):
         img, base = self._rank_case(points=500, softcore_points=140)
         self.assertEqual(_region(img, RANK_BOX), _expected(base, 2, 40, "UNRANKED", RANK_BOX))
-        img, base = self._rank_case(points=0, softcore_points=0)
+        img, base = self._rank_case(points=0, softcore_points=140)
         self.assertEqual(_region(img, RANK_BOX), _expected(base, 2, 40, "UNRANKED", RANK_BOX))
 
 

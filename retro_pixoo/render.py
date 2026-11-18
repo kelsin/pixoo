@@ -99,8 +99,7 @@ def profile_frame(p: Profile, fetcher: ImageFetcher) -> Image.Image:
             pct = f"TOP {top:.0f}%" if top >= 10 else f"TOP {top:.1f}%"
             font.draw_text(img, 62 - font.text_width(pct), 40, pct, CYAN)
     else:
-        softcore = p.points == 0 and p.softcore_points > 0
-        font.draw_text(img, 2, 40, "SOFTCORE" if softcore else "UNRANKED", GREY)
+        font.draw_text(img, 2, 40, "UNRANKED", GREY)
 
     # Last game: icon, title, progress bar
     d.line([0, 47, 63, 47], fill=DIM)

@@ -39,6 +39,23 @@ python -m retro_pixoo --user kelsin --send 192.168.1.50 --loop 10
 
 Add `--endpoint /divoom_api` if your firmware doesn't answer on `/post`.
 
+## Letterboxd + hourly update
+
+`retro_pixoo.update` is a one-shot command that builds four pages (RetroAchievements profile, last watched film, recent unlocks, recent diary) and pushes them to the Pixoo. Each page shows for 30 seconds by default (`--seconds`). Letterboxd data comes from the public RSS feed (user `kelsin13` by default, `--lb-user`); RetroAchievements needs `RA_API_KEY` set.
+
+```bash
+python -m retro_pixoo.update --sample --preview preview     # no network, no device
+python -m retro_pixoo.update --send 192.168.1.50
+```
+
+If one source fails (for example `RA_API_KEY` is missing), its pages are skipped and the other source's two pages are still shown. Exit codes: 0 all good, 1 if any source failed or no pages could be built (nothing is sent when there are no pages).
+
+Run it hourly from cron:
+
+```cron
+0 * * * * cd /path/to/pixoo && RA_API_KEY=... /path/to/python3 -m retro_pixoo.update --send 192.168.1.50 >> /tmp/pixoo.log 2>&1
+```
+
 ## Use from your own script
 
 ```python

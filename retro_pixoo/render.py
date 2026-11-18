@@ -1,17 +1,21 @@
-"""Render RetroAchievements data into 64x64 frames for the Pixoo-64.
+"""Render RetroAchievements and Letterboxd data into 64x64 frames for the Pixoo-64.
 
-Two pages:
-  profile_frame - avatar, name, online status, points, rank, last game progress
-  recent_frame  - the three most recent unlocks with their badges
+Pages:
+  profile_frame      - avatar, name, online status, points, rank, last game progress
+  recent_frame       - the three most recent unlocks with their badges
+  last_watched_frame - latest Letterboxd diary film: poster, title, year, rating
+  diary_frame        - the next four diary films as small posters with ratings
 """
 
 from __future__ import annotations
 
 import hashlib
+from datetime import date
 
 from PIL import Image, ImageDraw
 
 from . import font
+from .letterboxd import DiaryEntry
 from .ra import ImageFetcher, Profile
 
 SIZE = 64
@@ -25,6 +29,10 @@ CYAN = (60, 200, 240)
 GREEN = (60, 210, 90)
 HEADER = (24, 26, 40)
 BAR_BG = (40, 40, 50)
+RED = (230, 60, 80)
+
+_STAR = ("..#..", ".###.", "#####", ".###.", ".#.#.")
+_HEART = (".#.#.", "#####", "#####", ".###.", "..#..")
 
 
 def _placeholder(key: str, size: int) -> Image.Image:
@@ -131,6 +139,109 @@ def recent_frame(p: Profile, fetcher: ImageFetcher, count: int = 3) -> Image.Ima
             font.draw_text(img, 20, y + i * 6, line, WHITE)
         font.draw_text(img, 20, y + 12, f"{a.points} PTS", GOLD if a.hardcore else GREY)
         y += 19
+    return img
+
+
+def _glyph(img: Image.Image, x: int, y: int, rows: tuple[str, ...], color, cols: int | None = None) -> None:
+    px = img.load()
+    for gy, row in enumerate(rows):
+        for gx, bit in enumerate(row[:cols]):
+            if bit == "#" and 0 <= x + gx < SIZE and 0 <= y + gy < SIZE:
+                px[x + gx, y + gy] = color
+
+
+def _stars(img: Image.Image, x: int, y: int, rating: float | None, color=GOLD, small: bool = False) -> int:
+    """Draw a star rating; returns the width drawn (0 when unrated).
+
+    Large stars are 5x5 glyphs on a 6px advance; small ones are 2x2 dots on a
+    3px advance so five fit in 14px. A half star is the glyph's left half.
+    """
+    if rating is None:
+        return 0
+    full, half = int(rating), rating % 1 >= 0.5
+    adv, half_w = (3, 1) if small else (6, 3)
+    d = ImageDraw.Draw(img)
+    for i in range(full + half):
+        sx = x + i * adv
+        if small:
+            d.rectangle([sx, y, sx + (half_w - 1 if i == full else 1), y + 1], fill=color)
+        else:
+            _glyph(img, sx, y, _STAR, color, cols=half_w if i == full else None)
+    if full + half == 0:
+        return 0
+    return full * adv + half_w if half else full * adv - 1
+
+
+def _poster(fetcher: ImageFetcher, e: DiaryEntry, w: int, h: int) -> Image.Image:
+    img = fetcher.get(e.poster_url)
+    if img is None:
+        return _placeholder(e.title, w).resize((w, h), Image.NEAREST)
+    return img.resize((w, h), Image.LANCZOS)
+
+
+def _watched_date(s: str) -> str | None:
+    """'2026-11-16' -> 'NOV 16'; None if it can't be parsed."""
+    try:
+        d = date.fromisoformat(s)
+    except ValueError:
+        return None
+    return f"{d.strftime('%b').upper()} {d.day}"
+
+
+def _header(img: Image.Image, title: str) -> None:
+    ImageDraw.Draw(img).rectangle([0, 0, 63, 6], fill=HEADER)
+    font.draw_text(img, 2, 1, title, GOLD)
+
+
+def last_watched_frame(entries: list[DiaryEntry], fetcher: ImageFetcher) -> Image.Image:
+    img = Image.new("RGB", (SIZE, SIZE), BG)
+    _header(img, "LAST WATCHED")
+    if not entries:
+        font.draw_text(img, 2, 28, "NO FILMS", GREY)
+        return img
+
+    e = entries[0]
+    img.paste(_poster(fetcher, e, 28, 42), (1, 9))
+    y = 9
+    for line in font.wrap(e.title, 31, 4):
+        font.draw_text(img, 32, y, line, WHITE)
+        y += 6
+    if e.year:
+        font.draw_text(img, 32, y + 1, str(e.year), GREY)
+        y += 7
+    if _stars(img, 32, y + 1, e.rating):
+        y += 7
+    x = 32
+    if e.liked:
+        _glyph(img, x, y + 1, _HEART, RED)
+        x += 7
+    if e.rewatch:
+        font.draw_text(img, x, y + 1, "RE", CYAN)
+    when = _watched_date(e.watched_date)
+    if when:
+        font.draw_text(img, 1, 56, f"WATCHED {when}", GREY)
+    return img
+
+
+def diary_frame(entries: list[DiaryEntry], fetcher: ImageFetcher, count: int = 4) -> Image.Image:
+    img = Image.new("RGB", (SIZE, SIZE), BG)
+    _header(img, "RECENT DIARY")
+    if not entries:
+        font.draw_text(img, 2, 28, "NO FILMS", GREY)
+        return img
+    films = entries[1 : 1 + count]
+    if not films:
+        font.draw_text(img, 2, 28, "NO MORE FILMS", GREY)
+        return img
+
+    for i, e in enumerate(films):
+        x = i * 16
+        img.paste(_poster(fetcher, e, 15, 22), (x, 9))
+        _stars(img, x, 33, e.rating, small=True)
+        # Numbered title list below the posters, in poster order.
+        ty = 37 + i * 6
+        font.draw_text(img, 1, ty, str(i + 1), GOLD)
+        font.draw_text(img, 7, ty, font.fit(e.title, 57), WHITE)
     return img
 
 

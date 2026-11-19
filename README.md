@@ -24,6 +24,17 @@ export PIXOO_IP=192.168.1.50
 uv run retro-pixoo-update
 ```
 
+## BoardGameGeek pages
+
+Set `BGG_TOKEN` to a BoardGameGeek API token to add four board-game pages after the Letterboxd ones: `h` (your play h-index), `recent` (latest plays), `top` (most played this year) and `stats` (year totals). Without the token the pages are skipped, `bgg: BGG_TOKEN not set` goes to stderr and the run exits 1 like any failed source.
+
+```bash
+export BGG_TOKEN=your_token_here
+uv run retro-pixoo-update --bgg-user Kelsin --bgg-pages h,top
+```
+
+`--bgg-pages` takes a comma list (default `h,recent,top,stats`) and sets the order. Plays are read from BGG's plays API, so they only show up once logged there; Geek Group and BG Stats plays appear after their sync to BGG.
+
 ## Commands
 
 | Command | What it does |

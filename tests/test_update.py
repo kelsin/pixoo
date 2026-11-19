@@ -4,6 +4,10 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
+from retro_pixoo.bgg import load_sample_plays
+from retro_pixoo.bgg_render import (
+    bgg_h_frame, bgg_recent_frame, bgg_stats_frame, bgg_top_frame,
+)
 from retro_pixoo.letterboxd import load_sample_feed
 from retro_pixoo.ra import ImageFetcher, load_sample
 from retro_pixoo.render import (
@@ -85,6 +89,62 @@ class UpdateTests(unittest.TestCase):
             raise TimeoutError()
         _, errors = collect_pages(load_sample, lb, self.fetcher)
         self.assertEqual(errors, ["letterboxd: TimeoutError"])
+
+
+class BggUpdateTests(unittest.TestCase):
+    def setUp(self):
+        self.fetcher = ImageFetcher(offline=True)
+        self.p, self.e = load_sample(), load_sample_feed()
+        self.plays = load_sample_plays()
+
+    def test_bgg_pages_after_letterboxd(self):
+        pages, errors = collect_pages(
+            lambda: self.p, lambda: self.e, self.fetcher, bgg=lambda: self.plays)
+        self.assertEqual(errors, [])
+        self.assertEqual(len(pages), 10)
+        expected = [bgg_h_frame(self.plays), bgg_recent_frame(self.plays),
+                    bgg_top_frame(self.plays), bgg_stats_frame(self.plays)]
+        for got, want in zip(pages[6:], expected):
+            self.assertEqual(got.tobytes(), want.tobytes())
+
+    def test_bgg_pages_selection(self):
+        pages, _ = collect_pages(
+            lambda: self.p, lambda: self.e, self.fetcher,
+            bgg=lambda: self.plays, bgg_pages=("h",))
+        self.assertEqual(len(pages), 7)
+
+    def test_bgg_failure_keeps_others(self):
+        pages, errors = collect_pages(
+            lambda: self.p, lambda: self.e, self.fetcher, bgg=_boom("nope"))
+        self.assertEqual(len(pages), 6)
+        self.assertEqual(errors, ["bgg: nope"])
+
+    def test_main_sample_writes_ten_pages(self):
+        with tempfile.TemporaryDirectory() as d:
+            self.assertEqual(main(["--sample", "--preview", d, "--send", ""]), 0)
+            self.assertEqual(len(list(Path(d).glob("page*_64.png"))), 10)
+
+    def test_main_bgg_pages_subset(self):
+        with tempfile.TemporaryDirectory() as d:
+            self.assertEqual(
+                main(["--sample", "--bgg-pages", "top,h", "--preview", d, "--send", ""]), 0)
+            self.assertEqual(len(list(Path(d).glob("page*_64.png"))), 8)
+
+    def test_main_unknown_bgg_page(self):
+        with mock.patch("sys.stderr", new_callable=io.StringIO), \
+             self.assertRaises(SystemExit):
+            main(["--sample", "--bgg-pages", "nope"])
+
+    def test_main_live_without_token(self):
+        with mock.patch.dict("os.environ", {}, clear=False) as env, \
+             mock.patch("retro_pixoo.update.RAClient") as ra, \
+             mock.patch("retro_pixoo.update.LetterboxdClient") as lb, \
+             mock.patch("sys.stderr", new_callable=io.StringIO) as err:
+            env.pop("BGG_TOKEN", None)
+            ra.return_value.profile.return_value = load_sample()
+            lb.return_value.diary.return_value = load_sample_feed()
+            self.assertEqual(main(["--send", ""]), 1)
+        self.assertIn("bgg: BGG_TOKEN not set", err.getvalue())
 
 
 if __name__ == "__main__":

@@ -8,11 +8,14 @@ from __future__ import annotations
 import argparse
 import os
 import sys
+from datetime import date
 from pathlib import Path
 from typing import Callable
 
 from PIL import Image
 
+from .bgg import BggClient, Play, load_sample_plays
+from .bgg_render import bgg_h_frame, bgg_recent_frame, bgg_stats_frame, bgg_top_frame
 from .letterboxd import DiaryEntry, LetterboxdClient, load_sample_feed
 from .pixoo import Pixoo
 from .ra import ImageFetcher, Profile, RAClient, load_sample
@@ -21,11 +24,20 @@ from .render import (
     systems_frame,
 )
 
+BGG_PAGES = {
+    "h": bgg_h_frame,
+    "recent": bgg_recent_frame,
+    "top": bgg_top_frame,
+    "stats": bgg_stats_frame,
+}
+
 
 def collect_pages(
     ra: Callable[[], Profile],
     lb: Callable[[], list[DiaryEntry]],
     fetcher: ImageFetcher,
+    bgg: Callable[[], list[Play]] | None = None,
+    bgg_pages: tuple[str, ...] = tuple(BGG_PAGES),
 ) -> tuple[list[Image.Image], list[str]]:
     errors: list[str] = []
     profile = entries = None
@@ -37,6 +49,12 @@ def collect_pages(
         entries = lb()
     except Exception as e:
         errors.append(f"letterboxd: {str(e) or type(e).__name__}")
+    plays = None
+    if bgg is not None:
+        try:
+            plays = bgg()
+        except Exception as e:
+            errors.append(f"bgg: {str(e) or type(e).__name__}")
     pages: list[Image.Image] = []
     if profile is not None:
         pages.append(profile_frame(profile, fetcher))
@@ -46,6 +64,8 @@ def collect_pages(
         pages.append(last_watched_frame(entries, fetcher))
         pages.append(diary_frame(entries, fetcher))
         pages.append(month_stats_frame(entries))
+    if plays is not None:
+        pages.extend(BGG_PAGES[name](plays) for name in bgg_pages)
     return pages, errors
 
 
@@ -53,6 +73,9 @@ def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="retro_pixoo.update")
     ap.add_argument("--ra-user", default="kelsin")
     ap.add_argument("--lb-user", default="kelsin13")
+    ap.add_argument("--bgg-user", default="Kelsin")
+    ap.add_argument("--bgg-pages", default=",".join(BGG_PAGES),
+                    help="comma list of BGG pages: " + ",".join(BGG_PAGES))
     ap.add_argument("--sample", action="store_true", help="use bundled sample data, no network")
     ap.add_argument("--preview", type=Path, help="write PNG/GIF previews to this directory")
     ap.add_argument("--send", metavar="IP", default=os.environ.get("PIXOO_IP"),
@@ -60,18 +83,29 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--endpoint", default="/post", help="/post (default) or /divoom_api")
     ap.add_argument("--seconds", type=int, default=30, help="seconds per page on the device")
     args = ap.parse_args(argv)
+    bgg_pages = tuple(n.strip() for n in args.bgg_pages.split(",") if n.strip())
+    unknown = [n for n in bgg_pages if n not in BGG_PAGES]
+    if unknown:
+        ap.error(f"unknown --bgg-pages: {', '.join(unknown)} (choose from {', '.join(BGG_PAGES)})")
 
     if args.sample:
         fetcher = ImageFetcher(offline=True)
         ra, lb = load_sample, load_sample_feed
+        bgg = load_sample_plays
     else:
         fetcher = ImageFetcher()
         ra = lambda: RAClient().profile(args.ra_user)  # noqa: E731
         lb = lambda: LetterboxdClient().diary(args.lb_user)  # noqa: E731
+        bgg = None
+        if os.environ.get("BGG_TOKEN"):
+            bgg = lambda: BggClient().plays(args.bgg_user, date.today().year)  # noqa: E731
 
-    pages, errors = collect_pages(ra, lb, fetcher)
+    pages, errors = collect_pages(ra, lb, fetcher, bgg, bgg_pages)
     for err in errors:
         print(err, file=sys.stderr)
+    if not args.sample and bgg is None:
+        print("bgg: BGG_TOKEN not set", file=sys.stderr)
+        errors.append("bgg: BGG_TOKEN not set")
     if not pages:
         return 1
 

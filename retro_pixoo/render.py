@@ -5,12 +5,18 @@ Pages:
   recent_frame       - the three most recent unlocks with their badges
   last_watched_frame - latest Letterboxd diary film: poster, title, year, rating
   diary_frame        - the next four diary films as small posters with ratings
+  month_stats_frame  - this month's film count, average rating, likes, rewatches, rating histogram
+  watch_calendar_frame - this month as a calendar grid, lit on the days films were watched
+  decades_frame      - films per release decade as horizontal bars
+  top_rated_frame    - the highest rated diary films as small posters
   systems_frame      - top four RetroAchievements systems by recently played games
 """
 
 from __future__ import annotations
 
+import calendar
 import hashlib
+from collections import Counter
 from datetime import date, datetime, timezone
 
 from PIL import Image, ImageDraw
@@ -31,6 +37,10 @@ HEADER = (24, 26, 40)
 BAR_BG = (40, 40, 50)
 RED = (230, 60, 80)
 DIM_GOLD = (90, 68, 14)
+LB_GREEN = (0, 224, 84)
+LB_GREEN_HI = (150, 255, 170)
+LB_ORANGE = (255, 128, 0)
+LB_BLUE = (64, 188, 244)
 
 _STAR = ("..#..", "#.#.#", ".###.", "#.#.#", "..#..")
 _HEART = (".#.#.", "#####", "#####", ".###.", "..#..")
@@ -264,6 +274,157 @@ def diary_frame(entries: list[DiaryEntry], fetcher: ImageFetcher, count: int = 4
         ty = 37 + i * 6
         font.draw_text(img, 1, ty, str(i + 1), GOLD)
         font.draw_text(img, 7, ty, font.fit(e.title, 57), WHITE)
+    return img
+
+
+def _parse_date(s: str) -> date | None:
+    try:
+        return date.fromisoformat(s)
+    except ValueError:
+        return None
+
+
+def month_entries(entries: list[DiaryEntry], today: date) -> list[tuple[date, DiaryEntry]]:
+    """Entries watched in today's year and month, paired with their parsed date."""
+    out = []
+    for e in entries:
+        d = _parse_date(e.watched_date)
+        if d and (d.year, d.month) == (today.year, today.month):
+            out.append((d, e))
+    return out
+
+
+def rating_histogram(entries: list[DiaryEntry]) -> list[int]:
+    """Counts for the ten rating buckets 0.5, 1.0 ... 5.0."""
+    counts = [0] * 10
+    for e in entries:
+        if e.rating is not None and e.rating >= 0.5:
+            counts[min(10, round(e.rating * 2)) - 1] += 1
+    return counts
+
+
+def decade_counts(entries: list[DiaryEntry], max_rows: int = 9) -> list[tuple[int, int]]:
+    """(decade, films) in chronological order, keeping only the max_rows most common decades."""
+    counts = Counter(e.year // 10 * 10 for e in entries if e.year)
+    top = sorted(counts.items(), key=lambda kv: (-kv[1], -kv[0]))[:max_rows]
+    return sorted(top)
+
+
+def top_rated(entries: list[DiaryEntry], limit: int = 8) -> list[DiaryEntry]:
+    """Rated films, one per (title, year), best first; ties stay newest first."""
+    seen: set[tuple[str, int | None]] = set()
+    rated = []
+    for e in entries:
+        key = (e.title, e.year)
+        if e.rating is None or key in seen:
+            continue
+        seen.add(key)
+        rated.append(e)
+    rated.sort(key=lambda e: -e.rating)
+    return rated[:limit]
+
+
+def month_stats_frame(entries: list[DiaryEntry], today: date | None = None) -> Image.Image:
+    today = today or date.today()
+    img = Image.new("RGB", (SIZE, SIZE), BG)
+    d = ImageDraw.Draw(img)
+    _header(img, today.strftime("%B").upper())
+    films = [e for _, e in month_entries(entries, today)]
+    if not films:
+        font.draw_text(img, 2, 28, "NO FILMS", GREY)
+        return img
+
+    font.draw_text(img, 2, 9, f"{len(films)} FILMS", WHITE)
+    rated = [e.rating for e in films if e.rating is not None]
+    if rated:
+        avg = f"AVG {sum(rated) / len(rated):.1f}"
+        font.draw_text(img, 62 - font.text_width(avg), 9, avg, GOLD)
+    liked = sum(e.liked for e in films)
+    rewatched = sum(e.rewatch for e in films)
+    _glyph(img, 2, 16, _HEART, RED)
+    font.draw_text(img, 9, 16, str(liked), WHITE)
+    _glyph(img, 34, 16, _REWATCH, CYAN)
+    font.draw_text(img, 42, 16, str(rewatched), WHITE)
+
+    # Rating histogram: bars end at y=57, axis labels below.
+    hist = rating_histogram(films)
+    peak = max(hist) or 1
+    for i, n in enumerate(hist):
+        x = 2 + i * 6
+        if n:
+            h = max(1, round(33 * n / peak))
+            d.rectangle([x, 57 - h + 1, x + 4, 57], fill=GOLD)
+        else:
+            d.rectangle([x, 57, x + 4, 57], fill=DIM)
+    font.draw_text(img, 2 + 1 * 6 + 1, 59, "1", GREY)
+    font.draw_text(img, 2 + 9 * 6 + 1, 59, "5", GREY)
+    return img
+
+
+def watch_calendar_frame(entries: list[DiaryEntry], today: date | None = None) -> Image.Image:
+    today = today or date.today()
+    img = Image.new("RGB", (SIZE, SIZE), BG)
+    d = ImageDraw.Draw(img)
+    watched = month_entries(entries, today)
+    _header(img, today.strftime("%b").upper())
+    n = str(len(watched))
+    font.draw_text(img, 62 - font.text_width(n), 1, n, WHITE)
+    if not watched:
+        font.draw_text(img, 2, 28, "NO FILMS", GREY)
+        return img
+
+    per_day = Counter(day.day for day, _ in watched)
+    for c, letter in enumerate("SMTWTFS"):
+        font.draw_text(img, c * 9 + 2, 8, letter, GREY)
+    first_col = (today.replace(day=1).weekday() + 1) % 7  # Sunday first
+    for day in range(1, calendar.monthrange(today.year, today.month)[1] + 1):
+        row, col = divmod(first_col + day - 1, 7)
+        x, y = col * 9, 14 + row * 8
+        label = str(day)
+        tx = x + (8 - font.text_width(label)) // 2
+        if day > today.day:
+            font.draw_text(img, tx, y + 1, label, DIM)
+            continue
+        count = per_day[day]
+        fill, ink = (DIM, GREY) if not count else (LB_GREEN, BG) if count == 1 else (LB_GREEN_HI, BG)
+        d.rectangle([x, y, x + 7, y + 6], fill=fill)
+        font.draw_text(img, tx, y + 1, label, ink)
+        if day == today.day:
+            d.line([x, y + 7, x + 7, y + 7], fill=WHITE)  # underline: the row below the cell is free
+    return img
+
+
+def decades_frame(entries: list[DiaryEntry]) -> Image.Image:
+    img = Image.new("RGB", (SIZE, SIZE), BG)
+    d = ImageDraw.Draw(img)
+    _header(img, "DECADES")
+    rows = decade_counts(entries)
+    if not rows:
+        font.draw_text(img, 2, 28, "NO FILMS", GREY)
+        return img
+
+    peak = max(n for _, n in rows)
+    for i, (decade, n) in enumerate(rows):
+        y = 9 + i * 6
+        font.draw_text(img, 1, y, f"{decade % 100:02d}S", GREY)
+        w = max(1, round(40 * n / peak))
+        d.rectangle([14, y, 14 + w - 1, y + 4], fill=LB_BLUE if n == peak else LB_ORANGE)
+        font.draw_text(img, 14 + w + 2, y, str(n), WHITE)
+    return img
+
+
+def top_rated_frame(entries: list[DiaryEntry], fetcher: ImageFetcher) -> Image.Image:
+    img = Image.new("RGB", (SIZE, SIZE), BG)
+    _header(img, "TOP RATED")
+    films = top_rated(entries)
+    if not films:
+        font.draw_text(img, 2, 28, "NO FILMS", GREY)
+        return img
+
+    for i, e in enumerate(films):
+        x, y = (i % 4) * 16, 9 if i < 4 else 35
+        img.paste(_poster(fetcher, e, 15, 22), (x, y))
+        _stars(img, x, y + 24, e.rating, small=True)
     return img
 
 

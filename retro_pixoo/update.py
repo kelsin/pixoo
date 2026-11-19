@@ -15,7 +15,9 @@ from typing import Callable
 from PIL import Image
 
 from .bgg import BggClient, Play, load_sample_plays
-from .bgg_render import bgg_h_frame, bgg_recent_frame, bgg_stats_frame, bgg_top_frame
+from .bgg_render import (
+    bgg_h_frame, bgg_recent_frame, bgg_stats_frame, bgg_top_frame, needed_games,
+)
 from .letterboxd import DiaryEntry, LetterboxdClient, load_sample_feed
 from .pixoo import Pixoo
 from .ra import ImageFetcher, Profile, RAClient, load_sample
@@ -38,6 +40,7 @@ def collect_pages(
     fetcher: ImageFetcher,
     bgg: Callable[[], list[Play]] | None = None,
     bgg_pages: tuple[str, ...] = tuple(BGG_PAGES),
+    bgg_thumbs: Callable[[list[int]], dict[int, str]] | None = None,
 ) -> tuple[list[Image.Image], list[str]]:
     errors: list[str] = []
     profile = entries = None
@@ -65,7 +68,14 @@ def collect_pages(
         pages.append(diary_frame(entries, fetcher))
         pages.append(month_stats_frame(entries))
     if plays is not None:
-        pages.extend(BGG_PAGES[name](plays) for name in bgg_pages)
+        thumbs: dict[int, str] = {}
+        if bgg_thumbs is not None:
+            ids = [gid for gid, _ in needed_games(plays, bgg_pages)]
+            try:
+                thumbs = bgg_thumbs(ids) if ids else {}
+            except Exception:
+                thumbs = {}  # images are optional; identicons fill in
+        pages.extend(BGG_PAGES[name](plays, thumbs=thumbs, fetcher=fetcher) for name in bgg_pages)
     return pages, errors
 
 
@@ -100,7 +110,8 @@ def main(argv: list[str] | None = None) -> int:
         if os.environ.get("BGG_TOKEN"):
             bgg = lambda: BggClient().plays(args.bgg_user, date.today().year)  # noqa: E731
 
-    pages, errors = collect_pages(ra, lb, fetcher, bgg, bgg_pages)
+    bgg_thumbs = None if args.sample else BggClient().thumbnails
+    pages, errors = collect_pages(ra, lb, fetcher, bgg, bgg_pages, bgg_thumbs)
     for err in errors:
         print(err, file=sys.stderr)
     if not pages:

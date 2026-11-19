@@ -119,6 +119,27 @@ class BggUpdateTests(unittest.TestCase):
         self.assertEqual(len(pages), 6)
         self.assertEqual(errors, ["bgg: nope"])
 
+    def test_bgg_thumbs_called_once_with_needed(self):
+        from retro_pixoo.bgg_render import needed_games
+
+        calls = []
+
+        def thumbs(ids):
+            calls.append(list(ids))
+            return {}
+
+        collect_pages(lambda: self.p, lambda: self.e, self.fetcher,
+                      bgg=lambda: self.plays, bgg_thumbs=thumbs)
+        want = [g for g, _ in needed_games(self.plays, ("h", "recent", "top", "stats"))]
+        self.assertEqual(calls, [want])
+
+    def test_bgg_thumbs_failure_not_an_error(self):
+        pages, errors = collect_pages(
+            lambda: self.p, lambda: self.e, self.fetcher,
+            bgg=lambda: self.plays, bgg_thumbs=lambda ids: 1 / 0)
+        self.assertEqual(errors, [])
+        self.assertEqual(len(pages), 10)
+
     def test_main_sample_writes_ten_pages(self):
         with tempfile.TemporaryDirectory() as d:
             self.assertEqual(main(["--sample", "--preview", d, "--send", ""]), 0)

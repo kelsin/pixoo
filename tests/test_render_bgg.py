@@ -2,7 +2,11 @@ import unittest
 from datetime import date
 
 from retro_pixoo.bgg import Play, load_sample_plays
-from retro_pixoo.bgg_render import bgg_h_frame, bgg_recent_frame, bgg_stats_frame, bgg_top_frame
+from PIL import Image
+
+from retro_pixoo.bgg_render import (
+    bgg_h_frame, bgg_recent_frame, bgg_stats_frame, bgg_top_frame, needed_games,
+)
 
 TODAY = date(2026, 11, 19)
 FRAMES = [bgg_h_frame, bgg_recent_frame, bgg_top_frame, bgg_stats_frame]
@@ -40,6 +44,67 @@ class BggRenderTests(unittest.TestCase):
         without = bgg_stats_frame([P(minutes=0)], TODAY)
         with_min = bgg_stats_frame([P(minutes=90)], TODAY)
         self.assertNotEqual(without.tobytes(), with_min.tobytes())
+
+
+class _Fetcher:
+    def __init__(self):
+        self.calls = []
+
+    def get(self, url):
+        self.calls.append(url)
+        return Image.new("RGB", (40, 30), (200, 30, 30))
+
+
+class ImageTests(unittest.TestCase):
+    def setUp(self):
+        self.plays = load_sample_plays()
+        ids = [g for g, _ in needed_games(self.plays, ("h", "recent", "top", "stats"), TODAY)]
+        self.thumbs = {g: f"http://img/{g}" for g in ids}
+
+    def test_images_change_frames(self):
+        for f in FRAMES:
+            plain = f(self.plays, TODAY)
+            img = f(self.plays, TODAY, thumbs=self.thumbs, fetcher=_Fetcher())
+            self.assertEqual(img.size, (64, 64))
+            self.assertNotEqual(plain.tobytes(), img.tobytes())
+
+    def test_icon_size_and_urls_from_thumbs(self):
+        from retro_pixoo.bgg_render import _game_icon
+
+        fetcher = _Fetcher()
+        icon = _game_icon(fetcher, self.thumbs, 1, "X", 12)
+        self.assertEqual(icon.size, (12, 12))
+        self.assertEqual(fetcher.calls, [self.thumbs[1]])
+
+    def test_real_fetcher_dedupes(self):
+        from unittest import mock
+        from retro_pixoo.ra import ImageFetcher
+
+        f = ImageFetcher()
+        seen = []
+
+        def fake_get(url, **kw):
+            seen.append(url)
+            import io
+            buf = io.BytesIO()
+            Image.new("RGB", (8, 8)).save(buf, "PNG")
+            return mock.Mock(content=buf.getvalue(), raise_for_status=lambda: None)
+
+        with mock.patch("retro_pixoo.ra.requests.get", fake_get):
+            for fr in FRAMES:
+                fr(self.plays, TODAY, thumbs=self.thumbs, fetcher=f)
+        self.assertEqual(len(seen), len(set(seen)))
+
+    def test_missing_thumbs_use_identicon(self):
+        for f in FRAMES:
+            img = f(self.plays, TODAY, thumbs={}, fetcher=_Fetcher())
+            self.assertEqual(img.size, (64, 64))
+
+    def test_long_names_with_images(self):
+        plays = [P(game="X" * 60, gid=7)]
+        for f in FRAMES:
+            img = f(plays, TODAY, thumbs={7: "u"}, fetcher=_Fetcher())
+            self.assertEqual(img.size, (64, 64))
 
 
 if __name__ == "__main__":

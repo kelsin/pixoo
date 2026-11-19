@@ -7,8 +7,9 @@ from datetime import date
 from PIL import Image, ImageDraw
 
 from . import font
-from .bgg import Play, _counts_with_ids, game_counts, h_index, h_next, h_targets, top_played
-from .render import BG, CYAN, DIM, GOLD, GREY, SIZE, WHITE, _bar, _header
+from .bgg import Play, _counts_with_ids, game_counts, h_index, h_next, h_targets
+from .ra import ImageFetcher
+from .render import BG, CYAN, DIM, GOLD, GREY, SIZE, WHITE, _bar, _header, _placeholder
 
 
 def _year_plays(plays: list[Play], today: date) -> list[Play]:
@@ -55,7 +56,25 @@ def _blank(title: str, plays: list[Play]) -> tuple[Image.Image, ImageDraw.ImageD
     return img, ImageDraw.Draw(img)
 
 
-def bgg_h_frame(plays: list[Play], today: date | None = None) -> Image.Image:
+def _game_icon(
+    fetcher: ImageFetcher | None, thumbs: dict[int, str] | None, game_id: int, name: str, size: int
+) -> Image.Image:
+    """Square game thumbnail (center-cropped); identicon when there is no image."""
+    url = (thumbs or {}).get(game_id)
+    img = fetcher.get(url) if fetcher is not None and url else None
+    if img is None:
+        return _placeholder(name, size)
+    w, h = img.size
+    side = min(w, h)
+    left, top = (w - side) // 2, (h - side) // 2
+    img = img.crop((left, top, left + side, top + side))
+    return img.resize((size, size), Image.LANCZOS)
+
+
+def bgg_h_frame(
+    plays: list[Play], today: date | None = None,
+    thumbs: dict[int, str] | None = None, fetcher: ImageFetcher | None = None,
+) -> Image.Image:
     today = today or date.today()
     plays = _year_plays(plays, today)
     img, d = _blank(f"H-INDEX {today.year}", plays)
@@ -72,54 +91,71 @@ def bgg_h_frame(plays: list[Play], today: date | None = None) -> Image.Image:
 
     line = f"{extra} MORE PLAYS"
     font.draw_text(img, (SIZE - font.text_width(line)) // 2, 39, line, WHITE)
-    if first:
+    games = h_games(plays, today)
+    if games:
+        n = len(games)
+        x0 = (SIZE - (n * 14 + (n - 1) * 2)) // 2
+        for i, (gid, name) in enumerate(games):
+            img.paste(_game_icon(fetcher, thumbs, gid, name, 14), (x0 + i * 16, 48))
+    elif first:
         name = font.fit(first, 60)
         font.draw_text(img, (SIZE - font.text_width(name)) // 2, 47, name, GREY)
     return img
 
 
-def bgg_recent_frame(plays: list[Play], today: date | None = None, count: int = 4) -> Image.Image:
+def bgg_recent_frame(
+    plays: list[Play], today: date | None = None, count: int = 4,
+    thumbs: dict[int, str] | None = None, fetcher: ImageFetcher | None = None,
+) -> Image.Image:
     today = today or date.today()
     plays = _year_plays(plays, today)
     img, _ = _blank("RECENT PLAYS", plays)
     recent = sorted(plays, key=lambda p: p.date, reverse=True)[:count]
     for i, p in enumerate(recent):
-        y = 10 + i * 8
-        when = f"{p.date[5:7]}/{p.date[8:10]}"
-        wx = 62 - font.text_width(when)
-        font.draw_text(img, wx, y, when, GREY)
+        y = 10 + i * 13
+        img.paste(_game_icon(fetcher, thumbs, p.game_id, p.game, 12), (1, y))
         suffix = f" X{p.quantity}" if p.quantity > 1 else ""
-        name = font.fit(p.game, wx - 5 - font.text_width(suffix)) + suffix
-        font.draw_text(img, 2, y, name, WHITE)
+        name = font.fit(p.game, 62 - 15 - font.text_width(suffix)) + suffix
+        font.draw_text(img, 15, y, name, WHITE)
+        font.draw_text(img, 15, y + 7, f"{p.date[5:7]}/{p.date[8:10]}", GREY)
     return img
 
 
-def bgg_top_frame(plays: list[Play], today: date | None = None) -> Image.Image:
+def bgg_top_frame(
+    plays: list[Play], today: date | None = None,
+    thumbs: dict[int, str] | None = None, fetcher: ImageFetcher | None = None,
+) -> Image.Image:
     today = today or date.today()
     plays = _year_plays(plays, today)
     img, d = _blank("TOP PLAYED", plays)
-    rows = top_played(plays, 5)
+    rows = _counts_with_ids(plays)[:5]
     if not rows:
         return img
-    peak = rows[0][1]
-    for i, (name, n) in enumerate(rows):
+    peak = rows[0][2]
+    for i, (gid, name, n) in enumerate(rows):
         y = 9 + i * 11
         count = str(n)
         cx = 62 - font.text_width(count)
-        font.draw_text(img, 1, y, str(i + 1), GOLD)
-        font.draw_text(img, 7, y, font.fit(name, cx - 9), WHITE)
+        img.paste(_game_icon(fetcher, thumbs, gid, name, 10), (1, y))
+        font.draw_text(img, 12, y, str(i + 1), GOLD)
+        font.draw_text(img, 17, y, font.fit(name, cx - 19), WHITE)
         font.draw_text(img, cx, y, count, CYAN)
-        _bar(d, 7, y + 6, 55, 2, n / peak, GOLD if i == 0 else CYAN)
+        _bar(d, 12, y + 6, 50, 2, n / peak, GOLD if i == 0 else CYAN)
     return img
 
 
-def bgg_stats_frame(plays: list[Play], today: date | None = None) -> Image.Image:
+def bgg_stats_frame(
+    plays: list[Play], today: date | None = None,
+    thumbs: dict[int, str] | None = None, fetcher: ImageFetcher | None = None,
+) -> Image.Image:
     today = today or date.today()
     plays = _year_plays(plays, today)
     img, d = _blank(f"{today.year} STATS", plays)
     if not plays:
         return img
 
+    for gid, name in stats_game(plays, today):
+        img.paste(_game_icon(fetcher, thumbs, gid, name, 20), (43, 9))
     total = sum(p.quantity for p in plays)
     games = len({p.game_id for p in plays})
     font.draw_text(img, 2, 9, f"PLAYS {total}", WHITE)

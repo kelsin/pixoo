@@ -24,11 +24,22 @@ export PIXOO_IP=192.168.1.50
 uv run retro-pixoo-update
 ```
 
+## BoardGameGeek pages
+
+Set `BGG_TOKEN` to a BoardGameGeek API token to add four board-game pages after the Letterboxd ones: `h` (your play h-index), `recent` (latest plays), `top` (most played this year) and `stats` (year totals). Without the token the BGG pages are skipped silently.
+
+```bash
+export BGG_TOKEN=your_token_here
+uv run retro-pixoo-update --bgg-user Kelsin --bgg-pages h,top
+```
+
+`--bgg-pages` takes a comma list (default `h,recent,top,stats`) and sets the order. Plays are read from BGG's plays API, so they only show up once logged there; Geek Group and BG Stats plays appear after their sync to BGG.
+
 ## Commands
 
 | Command | What it does |
 | --- | --- |
-| `retro-pixoo-update` | One shot: RA profile, recent unlocks, top systems, Letterboxd last watched film, recent diary, this month's stats. 30s per page (`--seconds`). |
+| `retro-pixoo-update` | One shot: RA profile, recent unlocks, top systems, Letterboxd last watched film, recent diary, this month's stats, then the four BGG pages when `BGG_TOKEN` is set. 30s per page (`--seconds`). |
 | `retro-pixoo` | RA profile, recent unlocks and top systems only. `--loop MIN` keeps refreshing (minimum 5). |
 
 Common flags: `--sample`, `--preview DIR`, `--send IP` (defaults to `$PIXOO_IP`), `--endpoint /divoom_api` (if your firmware doesn't answer on `/post`). Users: `--ra-user` and `--lb-user` for `retro-pixoo-update`, `--user` for `retro-pixoo`.
@@ -51,15 +62,22 @@ uv sync
 security add-generic-password -s retro_pixoo -a "$USER" -w
 ```
 
+**2b. Store the BGG token the same way** (optional; without it the BGG pages are skipped). It prompts for the token:
+
+```bash
+security add-generic-password -s retro_pixoo_bgg -a "$USER" -w
+```
+
 **3. Give the Pixoo a fixed IP** with a DHCP reservation on your router, so the job doesn't lose it after a router reboot.
 
-**4. Write the agent.** Set `REPO` to your checkout, `PIXOO_IP` to the device, and the two usernames, then paste the whole block:
+**4. Write the agent.** Set `REPO` to your checkout, `PIXOO_IP` to the device, and the three usernames, then paste the whole block:
 
 ```bash
 REPO="$HOME/src/pixoo"
 PIXOO_IP=192.168.1.50
 RA_USER=kelsin
 LB_USER=kelsin13
+BGG_USER=Kelsin
 cat > ~/Library/LaunchAgents/com.retro-pixoo.hourly.plist <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -71,7 +89,7 @@ cat > ~/Library/LaunchAgents/com.retro-pixoo.hourly.plist <<EOF
   <array>
     <string>/bin/zsh</string>
     <string>-c</string>
-    <string>RA_API_KEY="\$(security find-generic-password -s retro_pixoo -a \$USER -w)" PIXOO_IP=$PIXOO_IP exec .venv/bin/python -u -m retro_pixoo.update --ra-user $RA_USER --lb-user $LB_USER</string>
+    <string>RA_API_KEY="\$(security find-generic-password -s retro_pixoo -a \$USER -w)" BGG_TOKEN="\$(security find-generic-password -s retro_pixoo_bgg -a \$USER -w 2>/dev/null)" PIXOO_IP=$PIXOO_IP exec .venv/bin/python -u -m retro_pixoo.update --ra-user $RA_USER --lb-user $LB_USER --bgg-user $BGG_USER</string>
   </array>
   <key>StartInterval</key><integer>3600</integer>
   <key>RunAtLoad</key><true/>

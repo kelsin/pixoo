@@ -1,0 +1,30 @@
+<?xml version="1.0"?>
+<plays username="Kelsin" userid="1" total="27" page="1">
+<play id="27" date="2026-11-15" quantity="1" length="70"><item name="Wingspan" objecttype="thing" objectid="266192"/></play>
+<play id="26" date="2026-11-12" quantity="1" length="55"><item name="Heat: Pedal to the Metal" objecttype="thing" objectid="366013"/></play>
+<play id="25" date="2026-11-08" length="45"><item name="Cascadia" objecttype="thing" objectid="295947"/></play>
+<play id="24" date="2026-11-02" quantity="1" length="130"><item name="Ark Nova" objecttype="thing" objectid="342942"/></play>
+<play id="23" date="2026-10-26" quantity="1" length="0"><item name="Azul" objecttype="thing" objectid="230802"/></play>
+<play id="22" date="2026-10-19" quantity="1" length="65"><item name="Wingspan" objecttype="thing" objectid="266192"/></play>
+<play id="21" date="2026-10-11" quantity="2" length="50"><item name="Heat: Pedal to the Metal" objecttype="thing" objectid="366013"/></play>
+<play id="20" date="2026-09-27" quantity="1" length="40"><item name="Cascadia" objecttype="thing" objectid="295947"/></play>
+<play id="19" date="2026-09-14" quantity="1" length="75"><item name="Everdell" objecttype="thing" objectid="199792"/></play>
+<play id="18" date="2026-08-30" quantity="1" length="60"><item name="Wingspan" objecttype="thing" objectid="266192"/></play>
+<play id="17" date="2026-08-16" quantity="1" length="120"><item name="Ark Nova" objecttype="thing" objectid="342942"/></play>
+<play id="16" date="2026-07-22" quantity="1" length="30"><item name="The Quacks of Quedlinburg" objecttype="thing" objectid="244521"/></play>
+<play id="15" date="2026-07-04" quantity="1" length="50"><item name="Azul" objecttype="thing" objectid="230802"/></play>
+<play id="14" date="2026-06-20" quantity="1" length="150"><item name="Spirit Island" objecttype="thing" objectid="162886"/></play>
+<play id="13" date="2026-06-07" quantity="1" length="65"><item name="Wingspan" objecttype="thing" objectid="266192"/></play>
+<play id="12" date="2026-05-24" quantity="1" length="45"><item name="Cascadia" objecttype="thing" objectid="295947"/></play>
+<play id="11" date="2026-05-10" quantity="1" length="60"><item name="Heat: Pedal to the Metal" objecttype="thing" objectid="366013"/></play>
+<play id="10" date="2026-04-19" quantity="1" length="80"><item name="Everdell" objecttype="thing" objectid="199792"/></play>
+<play id="9" date="2026-04-05" quantity="1" length="55"><item name="Wingspan" objecttype="thing" objectid="266192"/></play>
+<play id="8" date="2026-03-22" quantity="1" length="140"><item name="Brass: Birmingham" objecttype="thing" objectid="224517"/></play>
+<play id="7" date="2026-03-08" quantity="1" length="90"><item name="Root" objecttype="thing" objectid="237182"/></play>
+<play id="6" date="2026-02-15" quantity="1" length="130"><item name="Ark Nova" objecttype="thing" objectid="342942"/></play>
+<play id="5" date="2026-02-01" quantity="1" length="30"><item name="The Quacks of Quedlinburg" objecttype="thing" objectid="244521"/></play>
+<play id="4" date="2026-01-25" quantity="1" length="150"><item name="Spirit Island" objecttype="thing" objectid="162886"/></play>
+<play id="3" date="2026-01-18" quantity="1" length="50"><item name="Azul" objecttype="thing" objectid="230802"/></play>
+<play id="2" date="2026-01-11" quantity="1" length="45"><item name="Cascadia" objecttype="thing" objectid="295947"/></play>
+<play id="1" date="2025-12-20" quantity="1" length="60"><item name="Wingspan" objecttype="thing" objectid="266192"/></play>
+</plays>

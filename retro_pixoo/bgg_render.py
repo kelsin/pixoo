@@ -117,7 +117,7 @@ def bgg_recent_frame(
         suffix = f" X{p.quantity}" if p.quantity > 1 else ""
         name = font.fit(p.game, 62 - 15 - font.text_width(suffix)) + suffix
         font.draw_text(img, 15, y, name, WHITE)
-        font.draw_text(img, 15, y + 7, f"{p.date[5:7]}/{p.date[8:10]}", GREY)
+        font.draw_text(img, 15, y + 6, f"{p.date[5:7]}/{p.date[8:10]}", GREY)
     return img
 
 

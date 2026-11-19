@@ -72,9 +72,9 @@ class ImageTests(unittest.TestCase):
         from retro_pixoo.bgg_render import _game_icon
 
         fetcher = _Fetcher()
-        icon = _game_icon(fetcher, self.thumbs, 1, "X", 12)
+        icon = _game_icon(fetcher, {1: "u1"}, 1, "X", 12)
         self.assertEqual(icon.size, (12, 12))
-        self.assertEqual(fetcher.calls, [self.thumbs[1]])
+        self.assertEqual(fetcher.calls, ["u1"])
 
     def test_real_fetcher_dedupes(self):
         from unittest import mock

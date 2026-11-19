@@ -26,7 +26,7 @@ uv run retro-pixoo-update
 
 ## BoardGameGeek pages
 
-Set `BGG_TOKEN` to a BoardGameGeek API token to add four board-game pages after the Letterboxd ones: `h` (your play h-index), `recent` (latest plays), `top` (most played this year) and `stats` (year totals). Without the token the pages are skipped, `bgg: BGG_TOKEN not set` goes to stderr and the run exits 1 like any failed source.
+Set `BGG_TOKEN` to a BoardGameGeek API token to add four board-game pages after the Letterboxd ones: `h` (your play h-index), `recent` (latest plays), `top` (most played this year) and `stats` (year totals). Without the token the BGG pages are skipped silently.
 
 ```bash
 export BGG_TOKEN=your_token_here

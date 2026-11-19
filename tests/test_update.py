@@ -143,8 +143,8 @@ class BggUpdateTests(unittest.TestCase):
             env.pop("BGG_TOKEN", None)
             ra.return_value.profile.return_value = load_sample()
             lb.return_value.diary.return_value = load_sample_feed()
-            self.assertEqual(main(["--send", ""]), 1)
-        self.assertIn("bgg: BGG_TOKEN not set", err.getvalue())
+            self.assertEqual(main(["--send", ""]), 0)
+        self.assertEqual(err.getvalue(), "")
 
 
 if __name__ == "__main__":

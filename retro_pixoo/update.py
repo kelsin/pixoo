@@ -103,9 +103,6 @@ def main(argv: list[str] | None = None) -> int:
     pages, errors = collect_pages(ra, lb, fetcher, bgg, bgg_pages)
     for err in errors:
         print(err, file=sys.stderr)
-    if not args.sample and bgg is None:
-        print("bgg: BGG_TOKEN not set", file=sys.stderr)
-        errors.append("bgg: BGG_TOKEN not set")
     if not pages:
         return 1
 

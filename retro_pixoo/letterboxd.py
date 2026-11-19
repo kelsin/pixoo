@@ -57,6 +57,9 @@ def parse_feed(xml_text: str | bytes) -> list[DiaryEntry]:
                 poster_url=m.group(1) if m else "",
             )
         )
+    # The feed is in log order; show films in watch order. The sort is stable,
+    # so same-day watches keep the feed's newest-logged-first order.
+    entries.sort(key=lambda e: e.watched_date, reverse=True)
     return entries
 
 

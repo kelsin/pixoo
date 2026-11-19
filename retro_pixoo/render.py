@@ -30,8 +30,9 @@ CYAN = (60, 200, 240)
 HEADER = (24, 26, 40)
 BAR_BG = (40, 40, 50)
 RED = (230, 60, 80)
+DIM_GOLD = (90, 68, 14)
 
-_STAR = ("..#..", ".###.", "#####", ".###.", ".#.#.")
+_STAR = ("..#..", "#.#.#", ".###.", "#.#.#", "..#..")
 _HEART = (".#.#.", "#####", "#####", ".###.", "..#..")
 
 
@@ -170,19 +171,23 @@ def _stars(img: Image.Image, x: int, y: int, rating: float | None, color=GOLD, s
     """Draw a star rating; returns the width drawn (0 when unrated).
 
     Large stars are 5x5 glyphs on a 6px advance; small ones are 2x2 dots on a
-    3px advance so five fit in 14px. A half star is the glyph's left half.
+    3px advance so five fit in 14px. A small half star is the dot's left column;
+    a large one is a dim star with its left three columns lit.
     """
     if rating is None:
         return 0
     full, half = int(rating), rating % 1 >= 0.5
-    adv, half_w = (3, 1) if small else (6, 3)
+    adv, half_w = (3, 1) if small else (6, 5)
     d = ImageDraw.Draw(img)
     for i in range(full + half):
         sx = x + i * adv
         if small:
             d.rectangle([sx, y, sx + (half_w - 1 if i == full else 1), y + 1], fill=color)
+        elif i == full:
+            _glyph(img, sx, y, _STAR, DIM_GOLD)
+            _glyph(img, sx, y, _STAR, color, cols=3)
         else:
-            _glyph(img, sx, y, _STAR, color, cols=half_w if i == full else None)
+            _glyph(img, sx, y, _STAR, color)
     if full + half == 0:
         return 0
     return full * adv + half_w if half else full * adv - 1

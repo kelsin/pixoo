@@ -270,9 +270,9 @@ def diary_frame(entries: list[DiaryEntry], fetcher: ImageFetcher, count: int = 4
         x = i * 16
         img.paste(_poster(fetcher, e, 15, 22), (x, 9))
         _stars(img, x, 33, e.rating, small=True)
-        # Numbered title list below the posters, in poster order.
+        # Numbered title list below the posters, counting on from the last watched film (#1).
         ty = 37 + i * 6
-        font.draw_text(img, 1, ty, str(i + 1), GOLD)
+        font.draw_text(img, 1, ty, str(i + 2), GOLD)
         font.draw_text(img, 7, ty, font.fit(e.title, 57), WHITE)
     return img
 

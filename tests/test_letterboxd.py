@@ -28,8 +28,14 @@ class LetterboxdTests(unittest.TestCase):
             )
         )
         self.assertIsInstance(e, DiaryEntry)
-        self.assertEqual(entries[1].title, "Minority Report")
-        self.assertIs(entries[1].rewatch, True)
+        self.assertEqual(entries[2].title, "Minority Report")
+        self.assertIs(entries[2].rewatch, True)
+
+    def test_sorted_by_watched_date_newest_first(self):
+        # The feed is in log order; Godzilla was watched later than it was logged.
+        dates = [e.watched_date for e in load_sample_feed()]
+        self.assertEqual(dates, sorted(dates, reverse=True))
+        self.assertEqual(load_sample_feed()[1].title, "Godzilla Minus Zero")
 
     def test_unrated_and_half_star(self):
         xml = f"""<?xml version="1.0"?>
@@ -48,7 +54,7 @@ class LetterboxdTests(unittest.TestCase):
 <letterboxd:memberRating>3.5</letterboxd:memberRating>
 <description>x</description></item>
 </channel></rss>"""
-        a, b = parse_feed(xml)
+        b, a = parse_feed(xml)  # newest watch first
         self.assertIsNone(a.rating)
         self.assertIs(a.liked, False)
         self.assertEqual(a.poster_url, "")

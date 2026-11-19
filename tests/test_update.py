@@ -6,7 +6,9 @@ from unittest import mock
 
 from retro_pixoo.letterboxd import load_sample_feed
 from retro_pixoo.ra import ImageFetcher, load_sample
-from retro_pixoo.render import diary_frame, last_watched_frame, profile_frame, recent_frame, systems_frame
+from retro_pixoo.render import (
+    diary_frame, last_watched_frame, month_stats_frame, profile_frame, recent_frame, systems_frame,
+)
 from retro_pixoo import render
 from retro_pixoo.update import collect_pages, main
 
@@ -25,11 +27,12 @@ class UpdateTests(unittest.TestCase):
         p, e = load_sample(), load_sample_feed()
         pages, errors = collect_pages(lambda: p, lambda: e, self.fetcher)
         self.assertEqual(errors, [])
-        self.assertEqual(len(pages), 5)
+        self.assertEqual(len(pages), 6)
         expected = [
             profile_frame(p, self.fetcher), recent_frame(p, self.fetcher),
             systems_frame(p, self.fetcher),
             last_watched_frame(e, self.fetcher), diary_frame(e, self.fetcher),
+            month_stats_frame(e),
         ]
         for got, want in zip(pages, expected):
             self.assertEqual(got.tobytes(), want.tobytes())
@@ -40,7 +43,7 @@ class UpdateTests(unittest.TestCase):
     def test_ra_failure_keeps_letterboxd(self):
         e = load_sample_feed()
         pages, errors = collect_pages(_boom("no key"), lambda: e, self.fetcher)
-        self.assertEqual(len(pages), 2)
+        self.assertEqual(len(pages), 3)
         self.assertEqual(errors, ["retroachievements: no key"])
 
     def test_all_fail(self):

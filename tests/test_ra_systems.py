@@ -66,3 +66,19 @@ class TopSystemsTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def test_last_game_skips_games_without_progress():
+    from retro_pixoo.ra import parse_summary
+
+    profile = parse_summary(
+        {
+            "RecentlyPlayed": [
+                {"GameID": 1, "Title": "Empty", "AchievementsTotal": 0},
+                {"GameID": 2, "Title": "Played", "AchievementsTotal": 10},
+            ],
+            "Awarded": {"2": {"NumAchieved": 3, "NumPossibleAchievements": 10}},
+        }
+    )
+    assert profile.last_game.title == "Played"
+    assert (profile.last_game.achieved, profile.last_game.possible) == (3, 10)

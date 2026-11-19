@@ -110,18 +110,22 @@ def parse_summary(data: dict[str, Any]) -> Profile:
     awarded = data.get("Awarded") or {}
     last_game = None
     played = data.get("RecentlyPlayed") or []
-    if played:
-        g = played[0]
+    # The newest game with unlocked achievements; games launched without
+    # progress would show a meaningless 0/0.
+    for g in played:
         gid = _int(g.get("GameID"))
         prog = awarded.get(str(gid)) or {}
-        last_game = GameProgress(
-            game_id=gid,
-            title=g.get("Title", ""),
-            console=g.get("ConsoleName", ""),
-            icon_url=_media(g.get("ImageIcon")),
-            achieved=_int(prog.get("NumAchievedHardcore")) or _int(prog.get("NumAchieved")),
-            possible=_int(prog.get("NumPossibleAchievements")) or _int(g.get("AchievementsTotal")),
-        )
+        achieved = _int(prog.get("NumAchievedHardcore")) or _int(prog.get("NumAchieved"))
+        if achieved:
+            last_game = GameProgress(
+                game_id=gid,
+                title=g.get("Title", ""),
+                console=g.get("ConsoleName", ""),
+                icon_url=_media(g.get("ImageIcon")),
+                achieved=achieved,
+                possible=_int(prog.get("NumPossibleAchievements")) or _int(g.get("AchievementsTotal")),
+            )
+            break
 
     recent: list[Achievement] = []
     # RecentAchievements is {game_id: {achievement_id: {...}}}; flatten and sort newest first.

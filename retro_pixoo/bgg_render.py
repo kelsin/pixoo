@@ -7,13 +7,44 @@ from datetime import date
 from PIL import Image, ImageDraw
 
 from . import font
-from .bgg import Play, game_counts, h_index, h_next, top_played
+from .bgg import Play, _counts_with_ids, game_counts, h_index, h_next, h_targets, top_played
 from .render import BG, CYAN, DIM, GOLD, GREY, SIZE, WHITE, _bar, _header
 
 
 def _year_plays(plays: list[Play], today: date) -> list[Play]:
     prefix = f"{today.year}-"
     return [p for p in plays if p.date.startswith(prefix)]
+
+
+def recent_games(plays: list[Play], today: date, count: int = 4) -> list[tuple[int, str]]:
+    plays = _year_plays(plays, today)
+    recent = sorted(plays, key=lambda p: p.date, reverse=True)[:count]
+    return [(p.game_id, p.game) for p in recent]
+
+
+def top_games(plays: list[Play], today: date, n: int = 5) -> list[tuple[int, str]]:
+    return [(gid, name) for gid, name, _ in _counts_with_ids(_year_plays(plays, today))[:n]]
+
+
+def h_games(plays: list[Play], today: date, limit: int = 4) -> list[tuple[int, str]]:
+    return h_targets(_year_plays(plays, today), limit)
+
+
+def stats_game(plays: list[Play], today: date) -> list[tuple[int, str]]:
+    return top_games(plays, today, 1)
+
+
+def needed_games(
+    plays: list[Play], pages: tuple[str, ...], today: date | None = None
+) -> list[tuple[int, str]]:
+    today = today or date.today()
+    pickers = {"h": h_games, "recent": recent_games, "top": top_games, "stats": stats_game}
+    seen: dict[int, str] = {}
+    for page in pages:
+        pick = pickers.get(page)
+        for gid, name in pick(plays, today) if pick else []:
+            seen.setdefault(gid, name)
+    return list(seen.items())
 
 
 def _blank(title: str, plays: list[Play]) -> tuple[Image.Image, ImageDraw.ImageDraw]:

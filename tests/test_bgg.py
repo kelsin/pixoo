@@ -1,12 +1,16 @@
 import unittest
 from unittest import mock
 
+import requests
+
 from retro_pixoo.bgg import (
     BggClient,
     Play,
     game_counts,
     h_index,
     h_next,
+    h_targets,
+    parse_thumbnails,
     load_sample_plays,
     parse_plays,
     parse_total,
@@ -103,3 +107,66 @@ class SampleTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+THING_XML = """<items>
+<item type="boardgame" id="10"><thumbnail>http://x/10.jpg</thumbnail></item>
+<item type="boardgame" id="11"><thumbnail>  </thumbnail></item>
+<item type="boardgame" id="12"/>
+<item type="boardgame" id="13"><thumbnail> http://x/13.jpg </thumbnail></item>
+</items>"""
+
+
+def _resp(status=200, text="<items/>"):
+    m = mock.Mock()
+    m.status_code = status
+    m.content = text.encode()
+    return m
+
+
+class ThumbnailTests(unittest.TestCase):
+    def test_parse_thumbnails(self):
+        self.assertEqual(parse_thumbnails(THING_XML), {10: "http://x/10.jpg", 13: "http://x/13.jpg"})
+
+    def test_empty_ids_no_request(self):
+        with mock.patch("retro_pixoo.bgg.requests.get") as g:
+            self.assertEqual(BggClient("tok").thumbnails([]), {})
+            g.assert_not_called()
+
+    def test_chunks_and_merge(self):
+        def xml(ids):
+            return "<items>" + "".join(
+                f'<item id="{i}"><thumbnail>http://x/{i}</thumbnail></item>' for i in ids
+            ) + "</items>"
+
+        ids = list(range(1, 26))
+        with mock.patch(
+            "retro_pixoo.bgg.requests.get",
+            side_effect=[_resp(text=xml(ids[:20])), _resp(text=xml(ids[20:]))],
+        ) as g:
+            out = BggClient("tok").thumbnails(ids)
+        self.assertEqual(set(out), set(ids))
+        self.assertEqual(g.call_count, 2)
+        first, second = g.call_args_list
+        self.assertEqual(first.kwargs["params"]["id"], ",".join(map(str, ids[:20])))
+        self.assertEqual(second.kwargs["params"]["id"], ",".join(map(str, ids[20:])))
+        self.assertEqual(first.kwargs["headers"]["Authorization"], "Bearer tok")
+
+    def test_failure_returns_partial(self):
+        first = _resp(text='<items><item id="1"><thumbnail>http://x/1</thumbnail></item></items>')
+        for bad in (_resp(status=429), requests.RequestException("boom")):
+            with mock.patch("retro_pixoo.bgg.requests.get", side_effect=[first, bad]):
+                self.assertEqual(BggClient("tok").thumbnails(list(range(1, 26))), {1: "http://x/1"})
+
+
+class HTargetsTests(unittest.TestCase):
+    def test_targets_match_h_next(self):
+        ps = [P("A", 3, 1), P("B", 3, 2), P("C", 1, 3), P("D", 1, 4)]
+        # h=2, need 3; scanned top 3: A(3), B(3), C(1) -> only C short
+        self.assertEqual(h_targets(ps), [(3, "C")])
+        self.assertEqual(h_next(ps)[2], "C")
+
+    def test_limit_and_empty(self):
+        ps = [P(f"G{i}", 1, i) for i in range(1, 8)]
+        self.assertEqual(len(h_targets(ps, limit=2)), 2)
+        self.assertEqual(h_targets([]), [])

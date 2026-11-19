@@ -13,6 +13,8 @@ import requests
 SAMPLE_PATH = Path(__file__).with_name("sample_plays.xml")
 API = "https://boardgamegeek.com/xmlapi2/plays"
 PAGE_SIZE = 100
+THING_API = "https://boardgamegeek.com/xmlapi2/thing"
+THING_CHUNK = 20
 
 
 @dataclass
@@ -53,6 +55,16 @@ def parse_plays(xml_text: str | bytes) -> list[Play]:
     return plays
 
 
+def parse_thumbnails(xml_text: str | bytes) -> dict[int, str]:
+    out: dict[int, str] = {}
+    for el in ET.fromstring(xml_text).iter("item"):
+        gid = _int(el.get("id"), 0)
+        url = (el.findtext("thumbnail") or "").strip()
+        if gid and url:
+            out[gid] = url
+    return out
+
+
 class BggClient:
     def __init__(self, token: str | None = None, timeout: float = 10.0):
         self.token = token
@@ -86,18 +98,45 @@ class BggClient:
                 return plays
             page += 1
 
+    def thumbnails(self, ids: list[int]) -> dict[int, str]:
+        """Thumbnail URLs by game id; on any failure returns what was gathered."""
+        out: dict[int, str] = {}
+        token = self.token or os.environ.get("BGG_TOKEN")
+        if not ids or not token:
+            return out
+        headers = {"Authorization": f"Bearer {token}", "User-Agent": "retro-pixoo/0.1"}
+        try:
+            for i in range(0, len(ids), THING_CHUNK):
+                chunk = ids[i : i + THING_CHUNK]
+                r = requests.get(
+                    THING_API,
+                    headers=headers,
+                    params={"id": ",".join(str(g) for g in chunk)},
+                    timeout=self.timeout,
+                )
+                if r.status_code != 200:
+                    break
+                out.update(parse_thumbnails(r.content))
+        except (requests.RequestException, ET.ParseError):
+            pass
+        return out
+
 
 def load_sample_plays() -> list[Play]:
     return parse_plays(SAMPLE_PATH.read_text(encoding="utf-8"))
 
 
-def game_counts(plays: list[Play]) -> list[tuple[str, int]]:
+def _counts_with_ids(plays: list[Play]) -> list[tuple[int, str, int]]:
     c: Counter[tuple[int, str]] = Counter()
     for p in plays:
         c[(p.game_id, p.game)] += p.quantity
-    rows = [(name, n) for (_, name), n in c.items()]
-    rows.sort(key=lambda r: (-r[1], r[0]))
+    rows = [(gid, name, n) for (gid, name), n in c.items()]
+    rows.sort(key=lambda r: (-r[2], r[1]))
     return rows
+
+
+def game_counts(plays: list[Play]) -> list[tuple[str, int]]:
+    return [(name, n) for _, name, n in _counts_with_ids(plays)]
 
 
 def h_index(plays: list[Play]) -> int:
@@ -117,6 +156,13 @@ def h_next(plays: list[Play]) -> tuple[int, int, str | None]:
         extra += short
     extra += need * (need - len(counts))
     return h, extra, first
+
+
+def h_targets(plays: list[Play], limit: int = 4) -> list[tuple[int, str]]:
+    """(game_id, name) of games, among those h_next scans, still short of h+1 plays."""
+    need = h_index(plays) + 1
+    rows = _counts_with_ids(plays)[:need]
+    return [(gid, name) for gid, name, n in rows if n < need][:limit]
 
 
 def top_played(plays: list[Play], n: int = 5) -> list[tuple[str, int]]:

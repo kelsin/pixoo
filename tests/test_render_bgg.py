@@ -44,3 +44,31 @@ class BggRenderTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class NeededGamesTests(unittest.TestCase):
+    def setUp(self):
+        from retro_pixoo.bgg_render import needed_games
+
+        self.needed = needed_games
+        self.plays = load_sample_plays()
+
+    def test_all_pages_unique_and_bounded(self):
+        out = self.needed(self.plays, ("h", "recent", "top", "stats"), TODAY)
+        ids = [g for g, _ in out]
+        self.assertEqual(len(ids), len(set(ids)))
+        self.assertLessEqual(len(ids), 10)
+
+    def test_top_is_five(self):
+        self.assertEqual(len(self.needed(self.plays, ("top",), TODAY)), 5)
+
+    def test_recent_matches_newest(self):
+        year = [p for p in self.plays if p.date.startswith("2026-")]
+        newest = sorted(year, key=lambda p: p.date, reverse=True)[:4]
+        self.assertEqual(
+            self.needed(self.plays, ("recent",), TODAY), [(p.game_id, p.game) for p in newest]
+        )
+
+    def test_other_year_and_empty(self):
+        self.assertEqual(self.needed([], ("recent", "top"), TODAY), [])
+        self.assertEqual(self.needed([P(when="2025-06-01")], ("recent", "top", "h", "stats"), TODAY), [])

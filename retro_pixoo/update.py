@@ -23,7 +23,7 @@ from .pixoo import Pixoo
 from .ra import ImageFetcher, Profile, RAClient, load_sample
 from .render import (
     diary_frame, last_watched_frame, led_preview, month_stats_frame, profile_frame, recent_frame,
-    systems_frame,
+    systems_frame, watch_calendar_frame,
 )
 
 BGG_PAGES = {
@@ -67,6 +67,7 @@ def collect_pages(
         pages.append(last_watched_frame(entries, fetcher))
         pages.append(diary_frame(entries, fetcher))
         pages.append(month_stats_frame(entries))
+        pages.append(watch_calendar_frame(entries))
     if plays is not None:
         thumbs: dict[int, str] = {}
         if bgg_thumbs is not None:

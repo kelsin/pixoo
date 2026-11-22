@@ -66,6 +66,7 @@ class Profile:
     last_game: GameProgress | None
     recent: list[Achievement] = field(default_factory=list)
     systems: list[SystemStat] = field(default_factory=list)
+    games: list[GameProgress] = field(default_factory=list)
 
     @property
     def top_percent(self) -> float | None:
@@ -105,27 +106,34 @@ def top_systems(played: list[dict[str, Any]], awarded: dict[str, Any], limit: in
     return sorted(stats.values(), key=lambda s: -s.games)[:limit]
 
 
-def parse_summary(data: dict[str, Any]) -> Profile:
-    """Turn an API_GetUserSummary response into a Profile."""
-    awarded = data.get("Awarded") or {}
-    last_game = None
-    played = data.get("RecentlyPlayed") or []
-    # The newest game with unlocked achievements; games launched without
-    # progress would show a meaningless 0/0.
+def recent_games(played: list[dict[str, Any]], awarded: dict[str, Any], limit: int = 4) -> list[GameProgress]:
+    """Newest games with unlocked achievements; games launched without progress
+    would show a meaningless 0/0."""
+    games: list[GameProgress] = []
     for g in played:
         gid = _int(g.get("GameID"))
         prog = awarded.get(str(gid)) or {}
         achieved = _int(prog.get("NumAchievedHardcore")) or _int(prog.get("NumAchieved"))
         if achieved:
-            last_game = GameProgress(
+            games.append(GameProgress(
                 game_id=gid,
                 title=g.get("Title", ""),
                 console=g.get("ConsoleName", ""),
                 icon_url=_media(g.get("ImageIcon")),
                 achieved=achieved,
                 possible=_int(prog.get("NumPossibleAchievements")) or _int(g.get("AchievementsTotal")),
-            )
-            break
+            ))
+            if len(games) == limit:
+                break
+    return games
+
+
+def parse_summary(data: dict[str, Any]) -> Profile:
+    """Turn an API_GetUserSummary response into a Profile."""
+    awarded = data.get("Awarded") or {}
+    played = data.get("RecentlyPlayed") or []
+    games = recent_games(played, awarded)
+    last_game = games[0] if games else None
 
     recent: list[Achievement] = []
     # RecentAchievements is {game_id: {achievement_id: {...}}}; flatten and sort newest first.
@@ -159,6 +167,7 @@ def parse_summary(data: dict[str, Any]) -> Profile:
         last_game=last_game,
         recent=recent,
         systems=top_systems(played, awarded),
+        games=games,
     )
 
 

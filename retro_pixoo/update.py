@@ -23,7 +23,7 @@ from .pixoo import Pixoo
 from .ra import ImageFetcher, Profile, RAClient, load_sample
 from .render import (
     diary_frame, last_watched_frame, led_preview, month_stats_frame, profile_frame, recent_frame,
-    systems_frame, watch_calendar_frame,
+    recent_games_frame, systems_frame, watch_calendar_frame,
 )
 
 BGG_PAGES = {
@@ -62,6 +62,7 @@ def collect_pages(
     if profile is not None:
         pages.append(profile_frame(profile, fetcher))
         pages.append(recent_frame(profile, fetcher))
+        pages.append(recent_games_frame(profile, fetcher))
         pages.append(systems_frame(profile, fetcher))
     if entries is not None:
         pages.append(last_watched_frame(entries, fetcher))

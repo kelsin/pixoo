@@ -12,6 +12,7 @@ from retro_pixoo.letterboxd import load_sample_feed
 from retro_pixoo.ra import ImageFetcher, load_sample
 from retro_pixoo.render import (
     diary_frame, last_watched_frame, month_stats_frame, profile_frame, recent_frame, systems_frame,
+    watch_calendar_frame,
 )
 from retro_pixoo import render
 from retro_pixoo.update import collect_pages, main
@@ -31,12 +32,12 @@ class UpdateTests(unittest.TestCase):
         p, e = load_sample(), load_sample_feed()
         pages, errors = collect_pages(lambda: p, lambda: e, self.fetcher)
         self.assertEqual(errors, [])
-        self.assertEqual(len(pages), 6)
+        self.assertEqual(len(pages), 7)
         expected = [
             profile_frame(p, self.fetcher), recent_frame(p, self.fetcher),
             systems_frame(p, self.fetcher),
             last_watched_frame(e, self.fetcher), diary_frame(e, self.fetcher),
-            month_stats_frame(e),
+            month_stats_frame(e), watch_calendar_frame(e),
         ]
         for got, want in zip(pages, expected):
             self.assertEqual(got.tobytes(), want.tobytes())
@@ -47,7 +48,7 @@ class UpdateTests(unittest.TestCase):
     def test_ra_failure_keeps_letterboxd(self):
         e = load_sample_feed()
         pages, errors = collect_pages(_boom("no key"), lambda: e, self.fetcher)
-        self.assertEqual(len(pages), 3)
+        self.assertEqual(len(pages), 4)
         self.assertEqual(errors, ["retroachievements: no key"])
 
     def test_all_fail(self):
@@ -101,22 +102,22 @@ class BggUpdateTests(unittest.TestCase):
         pages, errors = collect_pages(
             lambda: self.p, lambda: self.e, self.fetcher, bgg=lambda: self.plays)
         self.assertEqual(errors, [])
-        self.assertEqual(len(pages), 10)
+        self.assertEqual(len(pages), 11)
         expected = [bgg_h_frame(self.plays), bgg_recent_frame(self.plays),
                     bgg_top_frame(self.plays), bgg_stats_frame(self.plays)]
-        for got, want in zip(pages[6:], expected):
+        for got, want in zip(pages[7:], expected):
             self.assertEqual(got.tobytes(), want.tobytes())
 
     def test_bgg_pages_selection(self):
         pages, _ = collect_pages(
             lambda: self.p, lambda: self.e, self.fetcher,
             bgg=lambda: self.plays, bgg_pages=("h",))
-        self.assertEqual(len(pages), 7)
+        self.assertEqual(len(pages), 8)
 
     def test_bgg_failure_keeps_others(self):
         pages, errors = collect_pages(
             lambda: self.p, lambda: self.e, self.fetcher, bgg=_boom("nope"))
-        self.assertEqual(len(pages), 6)
+        self.assertEqual(len(pages), 7)
         self.assertEqual(errors, ["bgg: nope"])
 
     def test_bgg_thumbs_called_once_with_needed(self):
@@ -138,18 +139,18 @@ class BggUpdateTests(unittest.TestCase):
             lambda: self.p, lambda: self.e, self.fetcher,
             bgg=lambda: self.plays, bgg_thumbs=lambda ids: 1 / 0)
         self.assertEqual(errors, [])
-        self.assertEqual(len(pages), 10)
+        self.assertEqual(len(pages), 11)
 
-    def test_main_sample_writes_ten_pages(self):
+    def test_main_sample_writes_eleven_pages(self):
         with tempfile.TemporaryDirectory() as d:
             self.assertEqual(main(["--sample", "--preview", d, "--send", ""]), 0)
-            self.assertEqual(len(list(Path(d).glob("page*_64.png"))), 10)
+            self.assertEqual(len(list(Path(d).glob("page*_64.png"))), 11)
 
     def test_main_bgg_pages_subset(self):
         with tempfile.TemporaryDirectory() as d:
             self.assertEqual(
                 main(["--sample", "--bgg-pages", "top,h", "--preview", d, "--send", ""]), 0)
-            self.assertEqual(len(list(Path(d).glob("page*_64.png"))), 8)
+            self.assertEqual(len(list(Path(d).glob("page*_64.png"))), 9)
 
     def test_main_unknown_bgg_page(self):
         with mock.patch("sys.stderr", new_callable=io.StringIO), \

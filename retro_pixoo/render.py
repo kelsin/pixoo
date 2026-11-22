@@ -5,7 +5,7 @@ Pages:
   recent_frame       - the three most recent unlocks with their badges
   last_watched_frame - latest Letterboxd diary film: poster, title, year, rating
   diary_frame        - the next four diary films as small posters with ratings
-  month_stats_frame  - this month's film count, average rating, likes, rewatches, films-per-day chart
+  month_stats_frame  - this month's film count, days watched, likes, rewatches, average rating, films-per-day chart
   watch_calendar_frame - this month as a calendar grid, lit on the days films were watched
   decades_frame      - films per release decade as horizontal bars
   top_rated_frame    - the highest rated diary films as small posters
@@ -38,7 +38,6 @@ BAR_BG = (40, 40, 50)
 RED = (230, 60, 80)
 DIM_GOLD = (90, 68, 14)
 LB_GREEN = (0, 224, 84)
-LB_GREEN_HI = (150, 255, 170)
 LB_ORANGE = (255, 128, 0)
 LB_BLUE = (64, 188, 244)
 DAY_COLORS = {1: CYAN, 2: LB_GREEN, 3: GOLD, 4: LB_ORANGE, 5: RED}  # films per day, 5 = 5+
@@ -324,6 +323,22 @@ def top_rated(entries: list[DiaryEntry], limit: int = 8) -> list[DiaryEntry]:
     return rated[:limit]
 
 
+def day_colors(per_day: list[int]) -> list[tuple[int, int, int] | None]:
+    """Colour per day by absolute film count (1-4, 5+); None for empty days. Within a run of
+    consecutive same-colour days every second one is darker."""
+    out, prev, run = [], 0, 0
+    for n in per_day:
+        key = min(n, 5)
+        run = run + 1 if key and key == prev else 0
+        prev = key
+        if not key:
+            out.append(None)
+        else:
+            base = DAY_COLORS[key]
+            out.append(base if run % 2 == 0 else tuple(c * 6 // 10 for c in base))
+    return out
+
+
 def month_stats_frame(entries: list[DiaryEntry], today: date | None = None) -> Image.Image:
     today = today or date.today()
     img = Image.new("RGB", (SIZE, SIZE), BG)
@@ -334,38 +349,37 @@ def month_stats_frame(entries: list[DiaryEntry], today: date | None = None) -> I
         font.draw_text(img, 2, 28, "NO FILMS", GREY)
         return img
 
+    days = sum(1 for n in films_per_day(entries, today) if n)
+    total = calendar.monthrange(today.year, today.month)[1]
     font.draw_text(img, 2, 9, f"{len(films)} FILMS", WHITE)
-    rated = [e.rating for e in films if e.rating is not None]
-    if rated:
-        avg = f"AVG {sum(rated) / len(rated):.1f}"
-        font.draw_text(img, 62 - font.text_width(avg), 9, avg, GOLD)
+    span = f"{days}/{total}D"
+    font.draw_text(img, 62 - font.text_width(span), 9, span, LB_GREEN)
     liked = sum(e.liked for e in films)
     rewatched = sum(e.rewatch for e in films)
     _glyph(img, 2, 16, _HEART, RED)
     font.draw_text(img, 9, 16, str(liked), WHITE)
-    _glyph(img, 34, 16, _REWATCH, CYAN)
-    font.draw_text(img, 42, 16, str(rewatched), WHITE)
+    _glyph(img, 24, 16, _REWATCH, CYAN)
+    font.draw_text(img, 32, 16, str(rewatched), WHITE)
+    rated = [e.rating for e in films if e.rating is not None]
+    if rated:
+        avg = f"{sum(rated) / len(rated):.1f}"
+        _glyph(img, 57, 16, _STAR, GOLD)
+        font.draw_text(img, 55 - font.text_width(avg), 16, avg, GOLD)
 
-    # Films per day: 2px bars, tallest day fills the chart. Colour is the absolute count
-    # (1-4, 5+); within a run of same-colour days every second bar is darker.
+    # Films per day: 2px bars centred in the 64px width, tallest day fills the chart.
     per_day = films_per_day(entries, today)
     peak = max(per_day) or 1
-    prev, run = 0, 0
-    for i, n in enumerate(per_day):
-        x = 2 + i * 2
-        key = min(n, 5)
-        run = run + 1 if key and key == prev else 0
-        prev = key
+    x0 = (SIZE - 2 * len(per_day)) // 2
+    for i, (n, color) in enumerate(zip(per_day, day_colors(per_day))):
+        x = x0 + i * 2
         if n:
             h = max(1, round(33 * n / peak))
-            base = DAY_COLORS[key]
-            color = base if run % 2 == 0 else tuple(c * 6 // 10 for c in base)
             d.rectangle([x, 57 - h + 1, x + 1, 57], fill=color)
         else:
             d.rectangle([x, 57, x + 1, 57], fill=DIM)
-    font.draw_text(img, 2, 59, "1", GREY)
+    font.draw_text(img, x0, 59, "1", GREY)
     last = str(len(per_day))
-    font.draw_text(img, 2 + len(per_day) * 2 - font.text_width(last), 59, last, GREY)
+    font.draw_text(img, x0 + len(per_day) * 2 - font.text_width(last), 59, last, GREY)
     return img
 
 
@@ -381,9 +395,9 @@ def watch_calendar_frame(entries: list[DiaryEntry], today: date | None = None) -
         font.draw_text(img, 2, 28, "NO FILMS", GREY)
         return img
 
-    per_day = Counter(day.day for day, _ in watched)
     for c, letter in enumerate("SMTWTFS"):
         font.draw_text(img, c * 9 + 2, 8, letter, GREY)
+    colors = day_colors(films_per_day(entries, today))
     first_col = (today.replace(day=1).weekday() + 1) % 7  # Sunday first
     for day in range(1, calendar.monthrange(today.year, today.month)[1] + 1):
         row, col = divmod(first_col + day - 1, 7)
@@ -393,8 +407,8 @@ def watch_calendar_frame(entries: list[DiaryEntry], today: date | None = None) -
         if day > today.day:
             font.draw_text(img, tx, y + 1, label, DIM)
             continue
-        count = per_day[day]
-        fill, ink = (DIM, GREY) if not count else (LB_GREEN, BG) if count == 1 else (LB_GREEN_HI, BG)
+        fill = colors[day - 1]
+        fill, ink = (DIM, GREY) if fill is None else (fill, BG)
         d.rectangle([x, y, x + 7, y + 6], fill=fill)
         font.draw_text(img, tx, y + 1, label, ink)
         if day == today.day:

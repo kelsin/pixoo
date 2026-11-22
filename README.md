@@ -48,6 +48,8 @@ If one source fails, `retro-pixoo-update` still shows the other source's pages a
 
 ## Run every hour on a Mac
 
+Shortcut: `make keychain-ra keychain-bgg install` does steps 1, 2, 2b, 4 and 5 below (override with `make install PIXOO_IP=... RA_USER=... LB_USER=... BGG_USER=...`). Then `make run`, `status`, `logs`, `reload` and `uninstall` manage it; `make help` lists everything.
+
 Run `retro-pixoo-update` from a launchd agent rather than cron or `--loop`: launchd starts it at login, catches up after sleep, and each run is a fresh process, so one failure can't wedge the next hour.
 
 **1. Install into the repo's `.venv/`** (gitignored), so the job doesn't depend on your shell's Python or pyenv shims:

@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>@LABEL@</string>
+  <key>WorkingDirectory</key><string>@REPO@</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/zsh</string>
+    <string>-c</string>
+    <string>RA_API_KEY="$(security find-generic-password -s retro_pixoo -a $USER -w)" BGG_TOKEN="$(security find-generic-password -s retro_pixoo_bgg -a $USER -w 2>/dev/null)" PIXOO_IP=@PIXOO_IP@ exec .venv/bin/python -u -m retro_pixoo.update --ra-user @RA_USER@ --lb-user @LB_USER@ --bgg-user @BGG_USER@</string>
+  </array>
+  <key>StartInterval</key><integer>3600</integer>
+  <key>RunAtLoad</key><true/>
+  <key>ProcessType</key><string>Background</string>
+  <key>StandardOutPath</key><string>@LOG@</string>
+  <key>StandardErrorPath</key><string>@LOG@</string>
+</dict>
+</plist>

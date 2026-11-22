@@ -5,7 +5,8 @@ from retro_pixoo.bgg import Play, load_sample_plays
 from PIL import Image
 
 from retro_pixoo.bgg_render import (
-    bgg_h_frame, bgg_recent_frame, bgg_stats_frame, bgg_top_frame, needed_games,
+    _pip_layout, _wrap, bgg_h_frame, bgg_recent_frame, bgg_stats_frame, bgg_top_frame,
+    needed_games,
 )
 
 TODAY = date(2026, 11, 19)
@@ -44,6 +45,45 @@ class BggRenderTests(unittest.TestCase):
         without = bgg_stats_frame([P(minutes=0)], TODAY)
         with_min = bgg_stats_frame([P(minutes=90)], TODAY)
         self.assertNotEqual(without.tobytes(), with_min.tobytes())
+
+
+class HLayoutTests(unittest.TestCase):
+    def test_pip_layout_fills_row(self):
+        for need in (4, 16, 25):
+            pips = _pip_layout(need, 2, 60)
+            self.assertEqual(len(pips), need)
+            self.assertEqual(pips[0][0], 2)
+            self.assertEqual(pips[-1][0] + pips[-1][1], 62)
+            for (x, w), (nx, _) in zip(pips, pips[1:]):
+                self.assertEqual(nx - (x + w), 1)
+            self.assertEqual(sum(w for _, w in pips) + need - 1, 60)
+
+    def test_pip_layout_huge_need_clamps(self):
+        pips = _pip_layout(80, 2, 60)
+        self.assertTrue(all(w == 1 for _, w in pips))
+        self.assertLessEqual(pips[-1][0] + pips[-1][1], 62)
+
+    def test_wrap_two_lines_truncates_last(self):
+        self.assertEqual(_wrap("WINGSPAN", 40, 2), ["WINGSPAN"])
+        lines = _wrap("TWILIGHT IMPERIUM FOURTH EDITION", 40, 2)
+        self.assertEqual(len(lines), 2)
+        self.assertEqual(lines[0], "TWILIGHT")
+        self.assertLessEqual(len(lines[1]) * 4, 41)
+
+    def test_h_frame_pips_and_bar(self):
+        plays = [P(game="A", gid=1, qty=3), P(game="B", gid=2, qty=2)]
+        img = bgg_h_frame(plays, TODAY)  # h=2, need=3; target B with 2/3
+        row = [img.getpixel((x, 60)) for x in range(2, 62)]
+        from retro_pixoo.render import DIM, GOLD
+        self.assertEqual(row[0], GOLD)
+        self.assertEqual(row[-1], DIM)
+        self.assertEqual(img.getpixel((1, 60)), (0, 0, 0))
+        self.assertNotEqual(img.getpixel((2, 59)), (0, 0, 0))
+
+    def test_h_frame_double_digit_h(self):
+        plays = [P(game=f"G{i}", gid=i, qty=15) for i in range(1, 16)]
+        img = bgg_h_frame(plays, TODAY)
+        self.assertEqual(img.size, (64, 64))
 
 
 class _Fetcher:

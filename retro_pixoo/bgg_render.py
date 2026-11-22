@@ -17,10 +17,25 @@ def _year_plays(plays: list[Play], today: date) -> list[Play]:
     return [p for p in plays if p.date.startswith(prefix)]
 
 
+def _recent_groups(plays: list[Play], count: int) -> list[tuple[Play, int]]:
+    """Newest play of each of the last `count` distinct games, with that game's play total
+    since the oldest of them (so a repeat shows as one row with a count)."""
+    newest: dict[int, Play] = {}
+    for p in sorted(plays, key=lambda p: p.date, reverse=True):
+        newest.setdefault(p.game_id, p)
+    shown = list(newest.values())[:count]
+    if not shown:
+        return []
+    cutoff = shown[-1].date
+    totals: dict[int, int] = {}
+    for p in plays:
+        if p.date >= cutoff:
+            totals[p.game_id] = totals.get(p.game_id, 0) + p.quantity
+    return [(p, totals[p.game_id]) for p in shown]
+
+
 def recent_games(plays: list[Play], today: date, count: int = 4) -> list[tuple[int, str]]:
-    plays = _year_plays(plays, today)
-    recent = sorted(plays, key=lambda p: p.date, reverse=True)[:count]
-    return [(p.game_id, p.game) for p in recent]
+    return [(p.game_id, p.game) for p, _ in _recent_groups(_year_plays(plays, today), count)]
 
 
 def top_games(plays: list[Play], today: date, n: int = 5) -> list[tuple[int, str]]:
@@ -110,14 +125,13 @@ def bgg_recent_frame(
     today = today or date.today()
     plays = _year_plays(plays, today)
     img, _ = _blank("RECENT PLAYS", plays)
-    recent = sorted(plays, key=lambda p: p.date, reverse=True)[:count]
-    for i, p in enumerate(recent):
+    for i, (p, n) in enumerate(_recent_groups(plays, count)):
         y = 10 + i * 13
         img.paste(_game_icon(fetcher, thumbs, p.game_id, p.game, 12), (1, y))
-        suffix = f" X{p.quantity}" if p.quantity > 1 else ""
-        name = font.fit(p.game, 62 - 15 - font.text_width(suffix)) + suffix
-        font.draw_text(img, 15, y, name, WHITE)
-        font.draw_text(img, 15, y + 6, f"{p.date[5:7]}/{p.date[8:10]}", GREY)
+        font.draw_text(img, 15, y, font.fit(p.game, 47), WHITE)
+        x = font.draw_text(img, 15, y + 6, f"{p.date[5:7]}/{p.date[8:10]}", GREY)
+        if n > 1:
+            font.draw_text(img, x + 1, y + 6, f"{n}X", CYAN)
     return img
 
 

@@ -134,6 +134,14 @@ class NeededGamesTests(unittest.TestCase):
             self.needed(self.plays, ("recent",), TODAY), [(p.game_id, p.game) for p in newest]
         )
 
+    def test_recent_collapses_repeats(self):
+        plays = [P("A", "2026-11-10", 1), P("A", "2026-11-09", 1, qty=2), P("B", "2026-11-08", 2),
+                 P("C", "2026-11-07", 3), P("D", "2026-11-06", 4), P("E", "2026-11-05", 5)]
+        from retro_pixoo.bgg_render import _recent_groups
+
+        got = [(p.game, n) for p, n in _recent_groups(plays, 4)]
+        self.assertEqual(got, [("A", 3), ("B", 1), ("C", 1), ("D", 1)])
+
     def test_other_year_and_empty(self):
         self.assertEqual(self.needed([], ("recent", "top"), TODAY), [])
         self.assertEqual(self.needed([P(when="2025-06-01")], ("recent", "top", "h", "stats"), TODAY), [])

@@ -9,6 +9,7 @@ Pages:
   watch_calendar_frame - this month as a calendar grid, lit on the days films were watched
   decades_frame      - films per release decade as horizontal bars
   top_rated_frame    - the highest rated diary films as small posters
+  recent_games_frame - the four most recently played games with their completion
   systems_frame      - top four RetroAchievements systems by recently played games
 """
 
@@ -156,7 +157,7 @@ def recent_frame(p: Profile, fetcher: ImageFetcher, count: int = 3) -> Image.Ima
         font.draw_text(img, 2, 28, "NONE YET", GREY)
         return img
 
-    y = 9
+    y = 8
     for a in p.recent[:count]:
         # 16x16 badge with a 1px frame: gold for hardcore, grey for softcore
         frame = GOLD if a.hardcore else GREY
@@ -514,8 +515,29 @@ def systems_frame(p: Profile, fetcher: ImageFetcher) -> Image.Image:
     return img
 
 
+def recent_games_frame(p: Profile, fetcher: ImageFetcher) -> Image.Image:
+    img = Image.new("RGB", (SIZE, SIZE), BG)
+    d = ImageDraw.Draw(img)
+    _header(img, "RECENT GAMES")
+    if not p.games:
+        font.draw_text(img, 2, 28, "NO GAMES", GREY)
+        return img
+
+    for i, g in enumerate(p.games[:4]):
+        y = 8 + i * 14
+        frac = g.achieved / g.possible if g.possible else 0
+        color = GOLD if frac >= 1 else CYAN
+        img.paste(_icon(fetcher, g.icon_url, 12), (1, y))
+        font.draw_text(img, 15, y, font.fit(g.title, 48), WHITE)
+        _bar(d, 15, y + 7, 30, 3, frac, color)
+        pct = f"{frac * 100:.0f}%"
+        font.draw_text(img, 63 - font.text_width(pct), y + 6, pct, color)
+    return img
+
+
 def frames(p: Profile, fetcher: ImageFetcher) -> list[Image.Image]:
-    return [profile_frame(p, fetcher), recent_frame(p, fetcher), systems_frame(p, fetcher)]
+    return [profile_frame(p, fetcher), recent_frame(p, fetcher), recent_games_frame(p, fetcher),
+            systems_frame(p, fetcher)]
 
 
 def led_preview(frame: Image.Image, scale: int = 8, gap: int = 1) -> Image.Image:

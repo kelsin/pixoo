@@ -41,6 +41,7 @@ LB_GREEN = (0, 224, 84)
 LB_GREEN_HI = (150, 255, 170)
 LB_ORANGE = (255, 128, 0)
 LB_BLUE = (64, 188, 244)
+DAY_COLORS = {1: CYAN, 2: LB_GREEN, 3: GOLD, 4: LB_ORANGE, 5: RED}  # films per day, 5 = 5+
 
 _STAR = ("..#..", "#.#.#", ".###.", "#.#.#", "..#..")
 _HEART = (".#.#.", "#####", "#####", ".###.", "..#..")
@@ -345,16 +346,23 @@ def month_stats_frame(entries: list[DiaryEntry], today: date | None = None) -> I
     _glyph(img, 34, 16, _REWATCH, CYAN)
     font.draw_text(img, 42, 16, str(rewatched), WHITE)
 
-    # Films per day: a 1px bar every 2px (fits 31 days), tallest day fills the chart.
+    # Films per day: 2px bars, tallest day fills the chart. Colour is the absolute count
+    # (1-4, 5+); within a run of same-colour days every second bar is darker.
     per_day = films_per_day(entries, today)
     peak = max(per_day) or 1
+    prev, run = 0, 0
     for i, n in enumerate(per_day):
         x = 2 + i * 2
+        key = min(n, 5)
+        run = run + 1 if key and key == prev else 0
+        prev = key
         if n:
             h = max(1, round(33 * n / peak))
-            d.rectangle([x, 57 - h + 1, x, 57], fill=GOLD)
+            base = DAY_COLORS[key]
+            color = base if run % 2 == 0 else tuple(c * 6 // 10 for c in base)
+            d.rectangle([x, 57 - h + 1, x + 1, 57], fill=color)
         else:
-            d.rectangle([x, 57, x, 57], fill=DIM)
+            d.rectangle([x, 57, x + 1, 57], fill=DIM)
     font.draw_text(img, 2, 59, "1", GREY)
     last = str(len(per_day))
     font.draw_text(img, 2 + len(per_day) * 2 - font.text_width(last), 59, last, GREY)

@@ -159,9 +159,9 @@ def recent_frame(p: Profile, fetcher: ImageFetcher, count: int = 4) -> Image.Ima
         y = 8 + i * 14
         img.paste(_icon(fetcher, a.badge_url, 12), (1, y))
         font.draw_text(img, 15, y, font.fit(a.title, 48), WHITE)
-        # points in gold for hardcore, grey for softcore, then the game name
+        # points in gold, then the game name
         pts = str(a.points)
-        font.draw_text(img, 15, y + 6, pts, GOLD if a.hardcore else GREY)
+        font.draw_text(img, 15, y + 6, pts, GOLD)
         gx = 15 + font.text_width(pts) + 3
         font.draw_text(img, gx, y + 6, font.fit(a.game_title, 64 - gx), GREY)
     return img

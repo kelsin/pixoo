@@ -71,6 +71,43 @@ def _game_icon(
     return img.resize((size, size), Image.LANCZOS)
 
 
+def _wrap(text: str, width: int, max_lines: int) -> list[str]:
+    """Greedy word wrap into at most max_lines; the last line is truncated to fit."""
+    words = font.normalize(text).split()
+    lines: list[str] = []
+    cur = ""
+    for i, word in enumerate(words):
+        trial = f"{cur} {word}" if cur else word
+        if font.text_width(trial) <= width or not cur:
+            cur = trial
+            continue
+        lines.append(cur)
+        cur = word
+        if len(lines) == max_lines - 1:
+            cur = " ".join(words[i:])
+            break
+    if cur:
+        lines.append(cur)
+    lines = lines[:max_lines]
+    if lines:
+        lines[-1] = font.fit(lines[-1], width).rstrip()
+    return lines
+
+
+def _pip_layout(count: int, x0: int, width: int) -> list[tuple[int, int]]:
+    """(x, w) per pip, 1px gaps, spread so the row spans exactly width px."""
+    gap = 1 if 2 * count - 1 <= width else 0
+    count = min(count, width)
+    avail = width - gap * (count - 1)
+    base, extra = divmod(avail, count)
+    pips, x = [], x0
+    for i in range(count):
+        w = base + (1 if i < extra else 0)
+        pips.append((x, w))
+        x += w + gap
+    return pips
+
+
 def bgg_h_frame(
     plays: list[Play], today: date | None = None,
     thumbs: dict[int, str] | None = None, fetcher: ImageFetcher | None = None,
@@ -82,24 +119,28 @@ def bgg_h_frame(
         return img
 
     h, extra, first = h_next(plays)
-    label = f"H {h}"  # the bitmap font has no "=" glyph
-    font.draw_text(img, (SIZE - font.text_width(label, 3)) // 2, 11, label, GOLD, scale=3)
-
     need = h + 1
-    done = sum(min(n, need) for _, n in game_counts(plays)[:need])
-    _bar(d, 4, 30, 56, 5, done / (need * need), CYAN)
+    scale = 3 if h < 10 else 2
+    font.draw_text(img, 3, 11 + (15 - 5 * scale) // 2, f"H{h}", GOLD, scale=scale)
+    font.draw_text(img, 32, 13, f"NEXT H{need}", CYAN)
+    font.draw_text(img, 32, 21, f"{extra} MORE", WHITE)
 
-    line = f"{extra} MORE PLAYS"
-    font.draw_text(img, (SIZE - font.text_width(line)) // 2, 39, line, WHITE)
+    done = sum(min(n, need) for _, n in game_counts(plays)[:need])
+    _bar(d, 4, 32, 56, 3, done / (need * need), CYAN)
+
     games = h_games(plays, today)
     if games:
-        n = len(games)
-        x0 = (SIZE - (n * 14 + (n - 1) * 2)) // 2
-        for i, (gid, name) in enumerate(games):
-            img.paste(_game_icon(fetcher, thumbs, gid, name, 14), (x0 + i * 16, 48))
+        gid, name = games[0]
+        n = next(c for g, _, c in _counts_with_ids(plays) if g == gid)
+        img.paste(_game_icon(fetcher, thumbs, gid, name, 18), (2, 38))
+        lines = _wrap(name, 40, 2)
+        for i, line in enumerate(lines):
+            font.draw_text(img, 23, 38 + i * 7, line, WHITE)
+        font.draw_text(img, 23, 38 + len(lines) * 7, f"{n}/{need}", GOLD)
+        for i, (x, w) in enumerate(_pip_layout(need, 2, 60)):
+            d.rectangle([x, 59, x + w - 1, 61], fill=GOLD if i < n else DIM)
     elif first:
-        name = font.fit(first, 60)
-        font.draw_text(img, (SIZE - font.text_width(name)) // 2, 47, name, GREY)
+        font.draw_text(img, 2, 40, font.fit(first, 60), GREY)
     return img
 
 

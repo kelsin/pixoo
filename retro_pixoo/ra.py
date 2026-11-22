@@ -30,7 +30,6 @@ class Achievement:
     points: int
     game_title: str
     badge_url: str
-    hardcore: bool
     date: str
 
 
@@ -146,7 +145,6 @@ def parse_summary(data: dict[str, Any]) -> Profile:
                     points=_int(a.get("Points")),
                     game_title=a.get("GameTitle", ""),
                     badge_url=f"{MEDIA_BASE}/Badge/{a.get('BadgeName')}.png" if a.get("BadgeName") else "",
-                    hardcore=bool(_int(a.get("HardcoreAchieved"))),
                     date=a.get("DateAwarded", ""),
                 )
             )

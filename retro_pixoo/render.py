@@ -2,7 +2,7 @@
 
 Pages:
   profile_frame      - avatar, name, time since last played, points, rank, last game progress
-  recent_frame       - the three most recent unlocks with their badges
+  recent_frame       - the four most recent unlocks: badge, title, points and game
   last_watched_frame - latest Letterboxd diary film: poster, title, year, rating
   diary_frame        - the next four diary films as small posters with ratings
   month_stats_frame  - this month's film count, days watched, likes, rewatches, average rating, films-per-day chart
@@ -147,27 +147,23 @@ def profile_frame(p: Profile, fetcher: ImageFetcher, now: datetime | None = None
     return img
 
 
-def recent_frame(p: Profile, fetcher: ImageFetcher, count: int = 3) -> Image.Image:
+def recent_frame(p: Profile, fetcher: ImageFetcher, count: int = 4) -> Image.Image:
     img = Image.new("RGB", (SIZE, SIZE), BG)
-    d = ImageDraw.Draw(img)
-    d.rectangle([0, 0, 63, 6], fill=HEADER)
-    font.draw_text(img, 2, 1, "RECENT UNLOCKS", GOLD)
+    _header(img, "RECENT UNLOCKS")
 
     if not p.recent:
         font.draw_text(img, 2, 28, "NONE YET", GREY)
         return img
 
-    y = 8
-    for a in p.recent[:count]:
-        # 16x16 badge with a 1px frame: gold for hardcore, grey for softcore
-        frame = GOLD if a.hardcore else GREY
-        d.rectangle([0, y - 1, 17, y + 16], outline=frame)
-        img.paste(_icon(fetcher, a.badge_url, 16), (1, y))
-        lines = font.wrap(a.title, 44, 2)
-        for i, line in enumerate(lines):
-            font.draw_text(img, 20, y + i * 6, line, WHITE)
-        font.draw_text(img, 20, y + 12, f"{a.points} PTS", GOLD if a.hardcore else GREY)
-        y += 19
+    for i, a in enumerate(p.recent[:count]):
+        y = 8 + i * 14
+        img.paste(_icon(fetcher, a.badge_url, 12), (1, y))
+        font.draw_text(img, 15, y, font.fit(a.title, 48), WHITE)
+        # points in gold, then the game name
+        pts = str(a.points)
+        font.draw_text(img, 15, y + 6, pts, GOLD)
+        gx = 15 + font.text_width(pts) + 3
+        font.draw_text(img, gx, y + 6, font.fit(a.game_title, 64 - gx), GREY)
     return img
 
 

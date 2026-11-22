@@ -1,4 +1,4 @@
-"""One-shot update: python -m retro_pixoo.update [--sample] [--preview DIR] [--send IP]
+"""One-shot update: python -m retro_pixoo.update [--sample] [--preview DIR | --no-preview] [--send IP]
 
 Meant for cron. Pages from a failing source are skipped; exit code 1 if anything failed.
 """
@@ -87,7 +87,9 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--bgg-pages", default=",".join(BGG_PAGES),
                     help="comma list of BGG pages: " + ",".join(BGG_PAGES))
     ap.add_argument("--sample", action="store_true", help="use bundled sample data, no network")
-    ap.add_argument("--preview", type=Path, help="write PNG/GIF previews to this directory")
+    ap.add_argument("--preview", type=Path, default=Path("preview"),
+                    help="write PNG/GIF previews to this directory (default: preview)")
+    ap.add_argument("--no-preview", action="store_true", help="skip writing local previews")
     ap.add_argument("--send", metavar="IP", default=os.environ.get("PIXOO_IP"),
                     help="push frames to the Pixoo at this IP (default: $PIXOO_IP)")
     ap.add_argument("--endpoint", default="/post", help="/post (default) or /divoom_api")
@@ -117,7 +119,7 @@ def main(argv: list[str] | None = None) -> int:
     if not pages:
         return 1
 
-    if args.preview:
+    if not args.no_preview:
         args.preview.mkdir(parents=True, exist_ok=True)
         leds = [led_preview(f) for f in pages]
         for i, (raw, led) in enumerate(zip(pages, leds)):

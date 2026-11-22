@@ -5,7 +5,7 @@ Pages:
   recent_frame       - the three most recent unlocks with their badges
   last_watched_frame - latest Letterboxd diary film: poster, title, year, rating
   diary_frame        - the next four diary films as small posters with ratings
-  month_stats_frame  - this month's film count, average rating, likes, rewatches, rating histogram
+  month_stats_frame  - this month's film count, average rating, likes, rewatches, films-per-day chart
   watch_calendar_frame - this month as a calendar grid, lit on the days films were watched
   decades_frame      - films per release decade as horizontal bars
   top_rated_frame    - the highest rated diary films as small posters
@@ -41,6 +41,7 @@ LB_GREEN = (0, 224, 84)
 LB_GREEN_HI = (150, 255, 170)
 LB_ORANGE = (255, 128, 0)
 LB_BLUE = (64, 188, 244)
+DAY_COLORS = {1: CYAN, 2: LB_GREEN, 3: GOLD, 4: LB_ORANGE, 5: RED}  # films per day, 5 = 5+
 
 _STAR = ("..#..", "#.#.#", ".###.", "#.#.#", "..#..")
 _HEART = (".#.#.", "#####", "#####", ".###.", "..#..")
@@ -294,12 +295,11 @@ def month_entries(entries: list[DiaryEntry], today: date) -> list[tuple[date, Di
     return out
 
 
-def rating_histogram(entries: list[DiaryEntry]) -> list[int]:
-    """Counts for the ten rating buckets 0.5, 1.0 ... 5.0."""
-    counts = [0] * 10
-    for e in entries:
-        if e.rating is not None and e.rating >= 0.5:
-            counts[min(10, round(e.rating * 2)) - 1] += 1
+def films_per_day(entries: list[DiaryEntry], today: date) -> list[int]:
+    """Films watched on each day of today's month, index 0 = the 1st."""
+    counts = [0] * calendar.monthrange(today.year, today.month)[1]
+    for d, _ in month_entries(entries, today):
+        counts[d.day - 1] += 1
     return counts
 
 
@@ -346,18 +346,26 @@ def month_stats_frame(entries: list[DiaryEntry], today: date | None = None) -> I
     _glyph(img, 34, 16, _REWATCH, CYAN)
     font.draw_text(img, 42, 16, str(rewatched), WHITE)
 
-    # Rating histogram: bars end at y=57, axis labels below.
-    hist = rating_histogram(films)
-    peak = max(hist) or 1
-    for i, n in enumerate(hist):
-        x = 2 + i * 6
+    # Films per day: 2px bars, tallest day fills the chart. Colour is the absolute count
+    # (1-4, 5+); within a run of same-colour days every second bar is darker.
+    per_day = films_per_day(entries, today)
+    peak = max(per_day) or 1
+    prev, run = 0, 0
+    for i, n in enumerate(per_day):
+        x = 2 + i * 2
+        key = min(n, 5)
+        run = run + 1 if key and key == prev else 0
+        prev = key
         if n:
             h = max(1, round(33 * n / peak))
-            d.rectangle([x, 57 - h + 1, x + 4, 57], fill=GOLD)
+            base = DAY_COLORS[key]
+            color = base if run % 2 == 0 else tuple(c * 6 // 10 for c in base)
+            d.rectangle([x, 57 - h + 1, x + 1, 57], fill=color)
         else:
-            d.rectangle([x, 57, x + 4, 57], fill=DIM)
-    font.draw_text(img, 2 + 1 * 6 + 1, 59, "1", GREY)
-    font.draw_text(img, 2 + 9 * 6 + 1, 59, "5", GREY)
+            d.rectangle([x, 57, x + 1, 57], fill=DIM)
+    font.draw_text(img, 2, 59, "1", GREY)
+    last = str(len(per_day))
+    font.draw_text(img, 2 + len(per_day) * 2 - font.text_width(last), 59, last, GREY)
     return img
 
 

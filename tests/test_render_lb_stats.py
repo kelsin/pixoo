@@ -6,9 +6,9 @@ from retro_pixoo.ra import ImageFetcher
 from retro_pixoo.render import (
     decade_counts,
     decades_frame,
+    films_per_day,
     month_entries,
     month_stats_frame,
-    rating_histogram,
     top_rated,
     top_rated_frame,
     watch_calendar_frame,
@@ -27,9 +27,12 @@ class HelperTests(unittest.TestCase):
               E("d", when="bad"), E("e", when="")]
         self.assertEqual([e.title for _, e in month_entries(es, TODAY)], ["a"])
 
-    def test_rating_histogram(self):
-        es = [E("a", rating=0.5), E("b", rating=1.0), E("c", rating=1.0), E("d", rating=5.0), E("e")]
-        self.assertEqual(rating_histogram(es), [1, 2, 0, 0, 0, 0, 0, 0, 0, 1])
+    def test_films_per_day(self):
+        es = [E("a", when="2026-11-01"), E("b", when="2026-11-01"), E("c", when="2026-11-30"),
+              E("d", when="2026-10-31")]
+        counts = films_per_day(es, TODAY)
+        self.assertEqual(len(counts), 30)
+        self.assertEqual((counts[0], counts[29], sum(counts)), (2, 1, 3))
 
     def test_decade_counts(self):
         es = [E("a", 1985), E("b", 1989), E("c", 2003), E("d", None), E("e", 2021)]

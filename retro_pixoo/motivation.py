@@ -31,8 +31,8 @@ def _canvas() -> tuple[Image.Image, ImageDraw.ImageDraw]:
     return img, ImageDraw.Draw(img)
 
 
-def _centred(img: Image.Image, y: int, text: str, color, scale: int = 1) -> None:
-    font.draw_text(img, (64 - font.text_width(font.normalize(text), scale)) // 2, y, text, color, scale)
+def _centred(img: Image.Image, y: int, text: str, color) -> None:
+    font.draw_text(img, (64 - font.text_width(font.normalize(text), 1)) // 2, y, text, color, 1)
 
 
 def _bitmap(img: Image.Image, x: int, y: int, rows: tuple[str, ...], color, scale: int = 1) -> None:

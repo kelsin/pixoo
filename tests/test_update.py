@@ -119,6 +119,13 @@ class BggUpdateTests(unittest.TestCase):
         for i, want in ((4, voice_frame()), (9, scroll_frame()), (14, breathe_frame())):
             self.assertEqual(pages[i].tobytes(), want.tobytes())
 
+    def test_bgg_empty_pages_no_breathe(self):
+        pages, _ = collect_pages(
+            lambda: self.p, lambda: self.e, self.fetcher,
+            bgg=lambda: self.plays, bgg_pages=())
+        self.assertEqual(len(pages), 10)
+        self.assertNotIn(breathe_frame().tobytes(), [pg.tobytes() for pg in pages])
+
     def test_bgg_failure_no_breathe(self):
         pages, errors = collect_pages(
             lambda: self.p, lambda: self.e, self.fetcher, bgg=_boom("x"))

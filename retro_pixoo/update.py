@@ -73,7 +73,7 @@ def collect_pages(
         pages.append(month_stats_frame(entries))
         pages.append(watch_calendar_frame(entries))
         pages.append(next(slides)())
-    if plays is not None:
+    if plays is not None and bgg_pages:
         thumbs: dict[int, str] = {}
         if bgg_thumbs is not None:
             ids = [gid for gid, _ in needed_games(plays, bgg_pages)]

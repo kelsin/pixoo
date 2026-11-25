@@ -27,6 +27,7 @@ class MotivationTests(unittest.TestCase):
         img = voice_frame()
         lowest = max(y for y in range(44) for x in range(64) if img.getpixel((x, y)) != BG)
         self.assertGreaterEqual(lowest, 38)
+        self.assertLessEqual(lowest, 42)
 
 
 if __name__ == "__main__":

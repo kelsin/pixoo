@@ -19,6 +19,7 @@ from .bgg_render import (
     bgg_h_frame, bgg_recent_frame, bgg_stats_frame, bgg_top_frame, needed_games,
 )
 from .letterboxd import DiaryEntry, LetterboxdClient, load_sample_feed
+from .motivation import SLIDES
 from .pixoo import Pixoo
 from .ra import ImageFetcher, Profile, RAClient, load_sample
 from .render import (
@@ -59,17 +60,20 @@ def collect_pages(
         except Exception as e:
             errors.append(f"bgg: {str(e) or type(e).__name__}")
     pages: list[Image.Image] = []
+    slides = iter(SLIDES)
     if profile is not None:
         pages.append(profile_frame(profile, fetcher))
         pages.append(recent_frame(profile, fetcher))
         pages.append(recent_games_frame(profile, fetcher))
         pages.append(systems_frame(profile, fetcher))
+        pages.append(next(slides)())
     if entries is not None:
         pages.append(last_watched_frame(entries, fetcher))
         pages.append(diary_frame(entries, fetcher))
         pages.append(month_stats_frame(entries))
         pages.append(watch_calendar_frame(entries))
-    if plays is not None:
+        pages.append(next(slides)())
+    if plays is not None and bgg_pages:
         thumbs: dict[int, str] = {}
         if bgg_thumbs is not None:
             ids = [gid for gid, _ in needed_games(plays, bgg_pages)]
@@ -78,6 +82,7 @@ def collect_pages(
             except Exception:
                 thumbs = {}  # images are optional; identicons fill in
         pages.extend(BGG_PAGES[name](plays, thumbs=thumbs, fetcher=fetcher) for name in bgg_pages)
+        pages.append(next(slides)())
     return pages, errors
 
 

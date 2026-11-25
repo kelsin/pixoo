@@ -39,7 +39,7 @@ uv run retro-pixoo-update --bgg-user Kelsin --bgg-pages h,top
 
 | Command | What it does |
 | --- | --- |
-| `retro-pixoo-update` | One shot: RA profile, recent unlocks, recent games, top systems, Letterboxd last watched film, recent diary, this month's stats, then the four BGG pages when `BGG_TOKEN` is set. 30s per page (`--seconds`). |
+| `retro-pixoo-update` | One shot: RA profile, recent unlocks, recent games, top systems, Letterboxd last watched film, recent diary, this month's stats, then the four BGG pages when `BGG_TOKEN` is set. A motivation slide (voice, scroll, breathe) follows each source's pages. 30s per page (`--seconds`). |
 | `retro-pixoo` | RA profile, recent unlocks, recent games and top systems only. `--loop MIN` keeps refreshing (minimum 5). |
 
 Common flags: `--sample`, `--preview DIR` (`retro-pixoo-update` always writes PNGs and a GIF of every page to `preview/` by default, even when sending; `--no-preview` skips it), `--send IP` (defaults to `$PIXOO_IP`), `--endpoint /divoom_api` (if your firmware doesn't answer on `/post`). Users: `--ra-user` and `--lb-user` for `retro-pixoo-update`, `--user` for `retro-pixoo`.

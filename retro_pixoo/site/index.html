@@ -100,7 +100,7 @@
     } else {
       if (k === "ArrowRight") go(1);
       else if (k === "ArrowLeft") go(-1);
-      else if (k === "ArrowUp") enterGrid();
+      else if (k === "ArrowUp" || k === "Enter") enterGrid();
       else return;
     }
     e.preventDefault();

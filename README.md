@@ -39,7 +39,7 @@ uv run retro-pixoo-update --bgg-user Kelsin --bgg-pages h,top
 
 | Command | What it does |
 | --- | --- |
-| `retro-pixoo-update` | One shot: RA profile, recent unlocks, recent games, top systems, Letterboxd last watched film, recent diary, this month's stats, then the four BGG pages when `BGG_TOKEN` is set. A motivation slide (voice, scroll, breathe) follows each source's pages. 30s per page (`--seconds`). |
+| `retro-pixoo-update` | One shot: RA profile, recent unlocks, recent games, top systems, Letterboxd last watched film, recent diary, this month's stats, then the four BGG pages when `BGG_TOKEN` is set. Letterboxd also gets four tag pages (FRIDA, REGAL, KERRIGAN, CAITLIN: this year's count and most recent film, read from the newest `letterboxd-<user>-*.zip` data export in `~/Downloads`, see `--lb-export-dir`). A motivation slide (voice, scroll, breathe, handhelds) follows each source's pages. 30s per page (`--seconds`). |
 | `retro-pixoo` | RA profile, recent unlocks, recent games and top systems only. `--loop MIN` keeps refreshing (minimum 5). |
 
 Common flags: `--sample`, `--preview DIR` (`retro-pixoo-update` always writes PNGs and a GIF of every page to `preview/` by default, even when sending; `--no-preview` skips it), `--send IP` (defaults to `$PIXOO_IP`), `--endpoint /divoom_api` (if your firmware doesn't answer on `/post`). Users: `--ra-user` and `--lb-user` for `retro-pixoo-update`, `--user` for `retro-pixoo`.
@@ -130,6 +130,8 @@ After editing the plist, run `bootout` then `bootstrap` again to pick up the cha
 
 - The agent only runs while you're logged in, which is what you want for a desk display. If the Mac is asleep, launchd runs one catch-up update on wake instead of one per missed hour.
 - Keep the repo out of `~/Documents`, `~/Desktop` and `~/Downloads`. macOS privacy protection blocks background jobs from reading those folders, and the job fails with `Operation not permitted`.
+- The Letterboxd tag pages read the data export from `~/Downloads`, so the hourly job's Python (the `.venv` python, which resolves to python3.13) needs System Settings → Privacy & Security → Files and Folders → Downloads Folder access. The update warns on stderr when the newest export is more than 8 days old.
+- A second agent, `com.retro-pixoo.lb-export`, opens `https://letterboxd.com/data/export/` in your browser every Sunday at 09:00 so a fresh export lands in `~/Downloads`. The browser must stay signed in to Letterboxd for the download to work. `make export` triggers one now.
 - If you move the repo or delete `.venv`, rerun step 4 and reload.
 
 ## Development

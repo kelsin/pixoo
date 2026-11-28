@@ -133,6 +133,32 @@ class UpdateTests(_TempPosterCache):
             self.assertTrue((Path(d) / "preview.gif").exists())
             self.assertTrue((Path(d) / "page5_led.png").exists())
 
+    def test_main_sample_site(self):
+        import json
+        with tempfile.TemporaryDirectory() as d, tempfile.TemporaryDirectory() as prev, \
+             mock.patch("retro_pixoo.update.Pixoo"):
+            self.assertEqual(main(["--sample", "--preview", prev, "--send", "", "--site", d]), 0)
+            expected = len(list(Path(prev).glob("page*_64.png")))
+            manifest = json.loads((Path(d) / "manifest.json").read_text())
+            self.assertGreater(expected, 0)
+            self.assertEqual(len(manifest["pages"]), expected)
+
+    def test_main_site_failure_still_sends_and_returns_1(self):
+        with tempfile.TemporaryDirectory() as d, \
+             mock.patch("retro_pixoo.update.write_site", side_effect=OSError("disk full")), \
+             mock.patch("retro_pixoo.update.Pixoo") as pixoo, \
+             mock.patch("sys.stderr", new_callable=io.StringIO) as err:
+            self.assertEqual(main(["--sample", "--no-preview", "--send", "1.2.3.4", "--site", d]), 1)
+        pixoo.return_value.show.assert_called_once()
+        self.assertIn("site: disk full", err.getvalue())
+
+    def test_main_send_failure_still_writes_site(self):
+        with tempfile.TemporaryDirectory() as d, \
+             mock.patch("retro_pixoo.update.Pixoo") as pixoo:
+            pixoo.return_value.show.side_effect = OSError("down")
+            self.assertEqual(main(["--sample", "--no-preview", "--send", "1.2.3.4", "--site", d]), 1)
+            self.assertTrue((Path(d) / "manifest.json").exists())
+
     def test_main_no_pages_does_not_send(self):
         with mock.patch("retro_pixoo.update.RAClient", side_effect=RuntimeError("x")), \
              mock.patch("retro_pixoo.update.LetterboxdClient", side_effect=RuntimeError("y")), \

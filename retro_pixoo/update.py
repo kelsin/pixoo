@@ -26,6 +26,7 @@ from .letterboxd import DiaryEntry, LetterboxdClient, load_sample_feed
 from .motivation import SLIDES
 from .pixoo import Pixoo
 from .ra import ImageFetcher, Profile, RAClient, load_sample
+from .site import write_site
 from .tags_render import tag_frames
 from .render import (
     diary_frame, last_watched_frame, led_preview, month_stats_frame, profile_frame, recent_frame,
@@ -121,6 +122,10 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--preview", type=Path, default=Path("preview"),
                     help="write PNG/GIF previews to this directory (default: preview)")
     ap.add_argument("--no-preview", action="store_true", help="skip writing local previews")
+    ap.add_argument("--site", type=Path, default=None, metavar="DIR",
+                    help="write the static gallery site (raw frames + manifest) to DIR")
+    ap.add_argument("--site-cname", metavar="HOST", default=os.environ.get("SITE_CNAME"),
+                    help="custom domain for the site's CNAME file (default: $SITE_CNAME)")
     ap.add_argument("--send", metavar="IP", default=os.environ.get("PIXOO_IP"),
                     help="push frames to the Pixoo at this IP (default: $PIXOO_IP)")
     ap.add_argument("--endpoint", default="/post", help="/post (default) or /divoom_api")
@@ -180,13 +185,23 @@ def main(argv: list[str] | None = None) -> int:
         leds[0].save(args.preview / "preview.gif", save_all=True, append_images=leds[1:],
                      duration=args.seconds * 1000, loop=0)
         print(f"wrote previews to {args.preview}")
+    failed = False
     if args.send:
         try:
             Pixoo(args.send, args.endpoint).show(pages, ms_per_frame=args.seconds * 1000)
+            print(f"sent {len(pages)} pages to {args.send}")
         except Exception as e:
             print(f"pixoo: {str(e) or type(e).__name__}", file=sys.stderr)
-            return 1
-        print(f"sent {len(pages)} pages to {args.send}")
+            failed = True
+    if args.site:
+        try:
+            write_site(pages, args.site, args.seconds, args.site_cname)
+            print(f"wrote site to {args.site}")
+        except Exception as e:
+            print(f"site: {str(e) or type(e).__name__}", file=sys.stderr)
+            failed = True
+    if failed:
+        return 1
     return 1 if errors else 0
 
 

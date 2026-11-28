@@ -6,3 +6,5 @@ preview/
 *.bundle
 dist/
 .pytest_cache/
+site/
+preview-site/

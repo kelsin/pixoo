@@ -95,12 +95,12 @@
       if (k === "ArrowRight") moveSel(1);
       else if (k === "ArrowLeft") moveSel(-1);
       else if (k === "ArrowDown") exitGrid();
-      else if (k === "Enter") exitGrid();
+      else if (k === "Enter" || k === "Escape") exitGrid();
       else return;
     } else {
       if (k === "ArrowRight") go(1);
       else if (k === "ArrowLeft") go(-1);
-      else if (k === "ArrowUp" || k === "Enter") enterGrid();
+      else if (k === "ArrowUp" || k === "Enter" || k === "Escape") enterGrid();
       else return;
     }
     e.preventDefault();

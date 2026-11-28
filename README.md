@@ -48,7 +48,7 @@ If one source fails, `retro-pixoo-update` still shows the other source's pages a
 
 ## Run every hour on a Mac
 
-Shortcut: `make keychain-ra keychain-bgg install` does steps 1, 2, 2b, 4 and 5 below (override with `make install PIXOO_IP=... RA_USER=... LB_USER=... BGG_USER=...`). Then `make run`, `status`, `logs`, `reload` and `uninstall` manage it; `make help` lists everything. Already installed the hourly agent? Run `make reload` to add the weekly export agent (`make install` would fail at the already-loaded hourly bootstrap). `make run` and `status` cover only the hourly agent.
+Shortcut: `make keychain-ra keychain-bgg install` does steps 1, 2, 2b, 4 and 5 below (override with `make install PIXOO_IP=... RA_USER=... LB_USER=... BGG_USER=...`). Then `make run`, `status`, `logs`, `reload` and `uninstall` manage it; `make help` lists everything. Already installed? Run `make reload PIXOO_IP=<your ip>` instead (`make install` would fail at the already-loaded bootstrap). `reload` rewrites the plist from the Makefile defaults, so pass your `PIXOO_IP` and any `RA_USER`, `LB_USER`, `BGG_USER` that differ.
 
 Run `retro-pixoo-update` from a launchd agent rather than cron or `--loop`: launchd starts it at login, catches up after sleep, and each run is a fresh process, so one failure can't wedge the next hour.
 
@@ -130,8 +130,8 @@ After editing the plist, run `bootout` then `bootstrap` again to pick up the cha
 
 - The agent only runs while you're logged in, which is what you want for a desk display. If the Mac is asleep, launchd runs one catch-up update on wake instead of one per missed hour.
 - Keep the repo out of `~/Documents`, `~/Desktop` and `~/Downloads`. macOS privacy protection blocks background jobs from reading those folders, and the job fails with `Operation not permitted`.
-- The Letterboxd tag pages read the data export from `~/Downloads`, so the hourly job's Python (the `.venv` python, which resolves to python3.13) needs System Settings → Privacy & Security → Files and Folders → Downloads Folder access. The update warns on stderr when the newest export is more than 8 days old.
-- A second agent, `com.retro-pixoo.lb-export`, opens `https://letterboxd.com/data/export/` in your browser every Sunday at 09:00 so a fresh export lands in `~/Downloads`. The browser must stay signed in to Letterboxd for the download to work. `make export` triggers one now. Already installed the hourly agent? Run `make reload` to add the weekly export agent. Check it with `launchctl print gui/$(id -u)/com.retro-pixoo.lb-export`.
+- The Letterboxd tag pages read the data export from `~/Downloads`, so the hourly job's Python (the `.venv` python, which resolves to python3.13) needs a one-time System Settings → Privacy & Security → Files and Folders → Downloads Folder grant. The update warns on stderr when the newest export is more than 8 days old.
+- Once a day (UTC), when today's export isn't in `~/Downloads` yet, the hourly job opens `https://letterboxd.com/data/export/` in your browser to fetch a fresh one; the next hourly run picks up the new ZIP. The browser must be signed in to Letterboxd and set to save downloads to `~/Downloads` without asking. `make export` triggers one manually. The update prints `letterboxd export: requested a new export` when it asks, and a failed request only prints a warning on stderr.
 - If you move the repo or delete `.venv`, rerun step 4 and reload.
 
 ## Development

@@ -2,17 +2,17 @@
 
 ## Intent
 
-Show, for four Letterboxd diary tags, how many films were logged with that tag this year and which one was the most recent. The four tags are `theater:frida`, `theater:regal`, `people:kerrigan` and `people:caitlin`. Letterboxd has no public API, the RSS feed carries no tags, and the tag pages sit behind a Cloudflare bot check, so the data comes from Letterboxd's own data export. A weekly job downloads the export through the user's real browser.
+Show, for four Letterboxd diary tags, how many films were logged with that tag this year and which one was the most recent. The four tags are `theater:frida`, `theater:regal`, `people:kerrigan` and `people:caitlin`. Letterboxd has no public API, the RSS feed carries no tags, and the tag pages sit behind a Cloudflare bot check, so the data comes from Letterboxd's own data export. The hourly job asks the user's real browser to download a fresh export once a day.
 
 ## Goals / non-goals
 
-- Goals: one page per tag in the rotation, followed by a new "PLAY MORE VIDEO GAMES" motivation slide. The export download is automated weekly.
+- Goals: one page per tag in the rotation, followed by a new "PLAY MORE VIDEO GAMES" motivation slide. The export download is requested automatically once a day.
 - Non-goals: configurable tags (they're constants in code), counts newer than the latest export, deleting old exports from `~/Downloads`.
 - Anti-goals: anything that gets around Letterboxd's bot check (headless login, browser impersonation, storing the Letterboxd password).
 
 ## Approaches
 
-1. **Data export + weekly browser download** (picked). `open https://letterboxd.com/data/export/` downloads the ZIP straight away using the browser's existing login. The hourly job reads `diary.csv` from the newest ZIP. Counts can lag by up to a week.
+1. **Data export + daily browser download** (picked). `open https://letterboxd.com/data/export/` downloads the ZIP straight away using the browser's existing login. The hourly job reads `diary.csv` from the newest ZIP. Counts can lag by up to a day.
 2. Scrape the tag pages: blocked by Cloudflare (403 "Just a moment"). Getting past that is bot-detection evasion, so it's ruled out.
 3. Official API: supports tag filters but needs approval Letterboxd rarely gives individuals.
 
@@ -50,11 +50,12 @@ Slide `handhelds_frame` (in `motivation.py`):
 
 After the BGG segment: four tag pages, then the next motivation slide. `SLIDES` gains `handhelds_frame` as its 4th entry, so with every source up the order is RA, voice, LB, scroll, BGG, breathe, tags, handhelds. As before, if a segment fails its slide is skipped and later slides shift up.
 
-## Weekly export job
+## Daily export request
 
-- New template `launchd/com.retro-pixoo.lb-export.plist.in`. It runs `/usr/bin/open https://letterboxd.com/data/export/` with `StartCalendarInterval` Sunday 09:00. launchd runs a missed interval on wake.
-- Makefile: `plist`, `install`, `uninstall` and `reload` handle both agents.
-- README documents it, including one manual step. The hourly job's Python needs **Files and Folders → Downloads** access, because macOS blocks background jobs from reading `~/Downloads`. This is the same kind of one-time grant as the existing Local Network permission.
+- No separate agent. `main` (live mode only) calls `request_export_if_due` before collecting pages. It opens `https://letterboxd.com/data/export/` with `/usr/bin/open` when the newest export isn't dated today (UTC, as in the file name) and `~/Library/Caches/retro-pixoo/export_requested` doesn't already hold today's date. A missing Downloads permission means no request (the tags source reports the real error). The current run uses the existing export; the new ZIP is picked up next hour.
+- A failed request prints `letterboxd export: request failed: ...` to stderr and is not an error. A successful one prints `letterboxd export: requested a new export`.
+- `make export` opens the page manually; `make uninstall` and `make reload` also remove the old weekly `com.retro-pixoo.lb-export` agent if present.
+- README documents the manual steps: the browser stays signed in to Letterboxd and saves downloads to `~/Downloads`, plus a one-time **Files and Folders → Downloads** grant for the hourly job's Python (macOS blocks background jobs from reading `~/Downloads`; same kind of grant as Local Network).
 
 ## CLI
 
@@ -62,7 +63,7 @@ After the BGG segment: four tag pages, then the next motivation slide. `SLIDES` 
 
 ## Calls made by Claude (user can override)
 
-- The weekly time is Sunday 09:00.
+- The export is requested at most once per UTC day.
 - The cache location is `~/Library/Caches/retro-pixoo/`.
 - The stale threshold is 8 days.
 - A tag with no films this year shows `NONE YET`.

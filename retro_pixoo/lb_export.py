@@ -68,6 +68,8 @@ def newest_export(directory: Path, user: str) -> Path:
 
 def export_time(path: Path) -> datetime:
     m = re.search(r"(\d{4})-(\d{2})-(\d{2})-(\d{2})-(\d{2})-utc", Path(path).name)
+    if not m:
+        raise ValueError(f"no -HH-MM-utc timestamp in {Path(path).name}")
     return datetime(*(int(g) for g in m.groups()), tzinfo=timezone.utc)
 
 
@@ -154,7 +156,14 @@ def save_export(data_path: Path, path: Path, csv_text: str) -> None:
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as f:
             json.dump(record, f)
+            f.flush()
+            os.fsync(f.fileno())
         os.replace(tmp, data_path)
+        dir_fd = os.open(data_path.parent, os.O_RDONLY)
+        try:
+            os.fsync(dir_fd)
+        finally:
+            os.close(dir_fd)
     except BaseException:
         Path(tmp).unlink(missing_ok=True)
         raise
@@ -181,14 +190,18 @@ def ingest_exports(directory: Path, user: str, data_path: Path) -> str | None:
     newest = next((p for p in reversed(found) if _is_complete_export(p)), None)
     if newest is None:
         return None
-    saved = load_saved(data_path)
-    took = None
-    if saved is None or export_time(newest) > saved[0]:
-        with zipfile.ZipFile(newest) as zf:
-            text = zf.read("diary.csv").decode("utf-8")
-        parse_diary_csv(text)  # a broken CSV raises before anything is deleted
-        save_export(data_path, newest, text)
-        took = newest.name
+    try:
+        saved = load_saved(data_path)
+        took = None
+        if saved is None or export_time(newest) > saved[0]:
+            with zipfile.ZipFile(newest) as zf:
+                text = zf.read("diary.csv").decode("utf-8")
+            parse_diary_csv(text)  # a broken CSV raises before anything is deleted
+            save_export(data_path, newest, text)
+            took = newest.name
+    except (KeyError, ValueError, zipfile.BadZipFile) as e:  # UnicodeDecodeError is a ValueError
+        e.export_name = newest.name
+        raise
     for p in found:
         if p.name <= newest.name:
             p.unlink(missing_ok=True)
@@ -199,7 +212,11 @@ def load_latest(directory: Path, user: str, data_path: Path, today: date) -> lis
     try:
         ingest_exports(directory, user, data_path)
     except OSError as e:
-        print(f"letterboxd export: can't read {directory}: {e}; using saved data", file=sys.stderr)
+        print(f"letterboxd export: export update failed: {e}; using saved data", file=sys.stderr)
+    except (KeyError, ValueError, zipfile.BadZipFile) as e:
+        name = getattr(e, "export_name", "")
+        print(f"letterboxd export: skipping unreadable export {name}: "
+              f"{str(e) or type(e).__name__}; using saved data", file=sys.stderr)
     saved = _read_saved(data_path)
     if saved is None:
         raise FileNotFoundError(

@@ -403,8 +403,42 @@ class LoadLatestTests(_TmpCase):
         self.addCleanup(self.dl.chmod, 0o700)
         rows, err = self._load()
         self.assertEqual(rows, parse_diary_csv(CSV))
-        self.assertIn(f"letterboxd export: can't read {self.dl}: ", err)
+        self.assertIn("letterboxd export: export update failed: ", err)
         self.assertTrue(err.rstrip().endswith("; using saved data"))
+
+    def test_broken_csv_in_newest_zip_uses_saved_data_and_keeps_zip(self):
+        save_export(self.data, self.dl / OLD, ONE_ROW_CSV)
+        _zip_with(self.dl / NEWEST, "Name\nonly a name\n")
+        rows, err = self._load()
+        self.assertEqual(rows, parse_diary_csv(ONE_ROW_CSV))
+        self.assertEqual(self.names(), [NEWEST])
+        self.assertIn(f"letterboxd export: skipping unreadable export {NEWEST}: ", err)
+        self.assertTrue(err.rstrip().endswith("; using saved data"))
+
+    def test_odd_name_uses_saved_data_and_keeps_zip(self):
+        odd = "letterboxd-kelsin13-2026-oops.zip"
+        save_export(self.data, self.dl / OLD, ONE_ROW_CSV)
+        _zip_with(self.dl / odd, CSV)
+        rows, err = self._load()
+        self.assertEqual(rows, parse_diary_csv(ONE_ROW_CSV))
+        self.assertEqual(self.names(), [odd])
+        self.assertIn(f"no -HH-MM-utc timestamp in {odd}", err)
+        self.assertIn("; using saved data", err)
+
+    def test_broken_csv_with_nothing_saved_raises(self):
+        _zip_with(self.dl / NEWEST, "Name\nonly a name\n")
+        with self.assertRaises(FileNotFoundError):
+            self._load()
+        self.assertEqual(self.names(), [NEWEST])
+
+    def test_export_time_without_timestamp_is_clear_value_error(self):
+        with self.assertRaisesRegex(ValueError, "no -HH-MM-utc timestamp in bad.zip"):
+            export_time(Path("bad.zip"))
+
+    def test_save_fsyncs_file_and_directory(self):
+        with mock.patch("os.fsync") as fsync:
+            save_export(self.data, self.dl / NEWEST, CSV)
+        self.assertEqual(fsync.call_count, 2)
 
     def test_stale_warning_from_saved_exported_at(self):
         save_export(self.data, self.dl / OLD, CSV)

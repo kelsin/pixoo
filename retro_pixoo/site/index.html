@@ -16,13 +16,14 @@
     background-image: linear-gradient(to right, #08080a 12.5%, transparent 12.5%),
                       linear-gradient(to bottom, #08080a 12.5%, transparent 12.5%);
     background-size: calc(100% / 64) calc(100% / 64); }
+  /* #ffc428 = GOLD in retro_pixoo/render.py */
   #bar { position: fixed; left: 0; right: 0; bottom: 0; height: 6px; background: #222; }
-  #fill { height: 100%; width: 0; background: #fff; }
+  #fill { height: 100%; width: 0; background: #ffc428; }
   /* Filmstrip: one horizontal row, the selected page is scrolled to the middle. */
   #grid { --cell: 240px; position: fixed; inset: 0; overflow: hidden; box-sizing: border-box;
           display: flex; align-items: center; gap: 16px; padding: 0 calc(50vw - var(--cell) / 2); }
   #grid img { flex: none; width: var(--cell); height: var(--cell); box-sizing: border-box; cursor: pointer; outline-offset: 0; }
-  #grid img.sel { outline: 3px solid #fff; }
+  #grid img.sel { outline: 3px solid #ffc428; }
   body.grid #full, body.grid #bar { display: none; }
   body:not(.grid) #grid { display: none; }
 </style>

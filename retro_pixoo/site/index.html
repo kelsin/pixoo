@@ -24,13 +24,16 @@
           display: flex; align-items: center; gap: 16px; padding: 0 calc(50vw - var(--cell) / 2); }
   #grid img { flex: none; width: var(--cell); height: var(--cell); box-sizing: border-box; cursor: pointer; outline-offset: 0; }
   #grid img.sel { outline: 3px solid #ffc428; }
-  body.grid #full, body.grid #bar { display: none; }
+  #pause { position: fixed; right: 12px; bottom: 14px; color: #ffc428; font: 12px/1 monospace; letter-spacing: 1px; display: none; }
+  body.paused #pause { display: block; }
+  body.grid #full, body.grid #bar, body.grid #pause { display: none; }
   body:not(.grid) #grid { display: none; }
 </style>
 </head>
 <body>
 <div id="full"><div id="screen"><img id="main" alt=""></div></div>
 <div id="bar"><div id="fill"></div></div>
+<div id="pause">PAUSED</div>
 <div id="grid"></div>
 <script>
 (() => {
@@ -38,13 +41,36 @@
   const fill = document.getElementById("fill");
   const grid = document.getElementById("grid");
   let pages = [], seconds = 30, generated = "", idx = 0;
-  let gridMode = false, elapsed = 0, last = null;
+  let gridMode = false, elapsed = 0, last = null, paused = false;
+
+  // URL hash: #slide=3 (1-based) and an optional &paused, e.g. #slide=3&paused
+  function readHash() {
+    const h = new URLSearchParams(location.hash.slice(1));
+    const n = parseInt(h.get("slide"), 10);
+    if (n >= 1) idx = n - 1;
+    paused = h.has("paused");
+    document.body.classList.toggle("paused", paused);
+  }
+  function writeHash() {
+    if (!pages.length) return;
+    const h = new URLSearchParams({ slide: String(idx + 1) });
+    if (paused) h.set("paused", "1");
+    history.replaceState(null, "", "#" + h.toString());
+  }
+  function togglePause() {
+    paused = !paused;
+    document.body.classList.toggle("paused", paused);
+    last = null;
+    writeHash();
+  }
+  readHash();
 
   const url = p => generated ? p + "?v=" + encodeURIComponent(generated) : p;
 
   function show() {
     if (pages.length) { main.src = url(pages[idx]); main.style.visibility = ""; }
     else { main.removeAttribute("src"); main.style.visibility = "hidden"; }
+    writeHash();
   }
 
   function buildGrid() {
@@ -63,6 +89,7 @@
     [...grid.children].forEach((c, i) => c.classList.toggle("sel", i === idx));
     const c = grid.children[idx];
     if (gridMode) center(true);
+    writeHash();
   }
 
   function center(smooth) {
@@ -92,6 +119,7 @@
   document.addEventListener("keydown", e => {
     if (e.altKey || e.metaKey || e.ctrlKey) return;
     const k = e.key;
+    if (k === "p" || k === "P" || k === " ") { togglePause(); e.preventDefault(); return; }
     if (gridMode) {
       if (k === "ArrowRight") moveSel(1);
       else if (k === "ArrowLeft") moveSel(-1);
@@ -108,7 +136,7 @@
   });
 
   function tick(ts) {
-    if (!gridMode && pages.length > 0) {
+    if (!gridMode && !paused && pages.length > 0) {
       if (last !== null) elapsed += (ts - last) / 1000;
       last = ts;
       if (elapsed >= seconds) go(1);
@@ -141,6 +169,15 @@
       if (!pages.length && !retry) retry = setTimeout(() => { retry = null; load(); }, 30 * 1000);
     }
   }
+
+  window.addEventListener("hashchange", () => {
+    const before = idx;
+    readHash();
+    idx = pages.length ? Math.min(idx, pages.length - 1) : idx;
+    if (idx !== before && !gridMode) { show(); restart(); }
+    else if (gridMode) markSel();
+    last = null;
+  });
 
   load();
   setInterval(load, 3600 * 1000);

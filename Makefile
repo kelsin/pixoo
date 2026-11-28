@@ -4,7 +4,7 @@ PIXOO_IP ?= 192.168.1.50
 RA_USER  ?= kelsin
 LB_USER  ?= kelsin13
 BGG_USER ?= Kelsin
-SITE_CNAME ?=
+SITE_CNAME ?= pixoo.kelsin.net
 
 LABEL := com.retro-pixoo.hourly
 PLIST := $(HOME)/Library/LaunchAgents/$(LABEL).plist
@@ -28,10 +28,10 @@ preview: ## Render every page from sample data into preview/ (no network or devi
 	uv run retro-pixoo-update --sample --preview preview
 
 site: ## Write the gallery site from sample data into preview-site/ (no network or device)
-	uv run retro-pixoo-update --sample --site preview-site $(if $(SITE_CNAME),--site-cname $(SITE_CNAME))
+	uv run retro-pixoo-update --sample --no-preview --send "" --site preview-site $(if $(SITE_CNAME),--site-cname $(SITE_CNAME))
 
-publish: ## Publish the live site dir to the gh-pages branch now (only if images changed)
-	scripts/publish-site.sh "$(HOME)/Library/Application Support/retro-pixoo/site"
+publish: ## Publish the live site dir to gh-pages now (only if images changed; FORCE=1 always pushes)
+	FORCE=$(FORCE) scripts/publish-site.sh "$(HOME)/Library/Application Support/retro-pixoo/site"
 
 update: ## Fetch live data and push to the Pixoo (needs RA_API_KEY, PIXOO_IP)
 	uv run retro-pixoo-update

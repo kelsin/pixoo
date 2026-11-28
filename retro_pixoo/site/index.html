@@ -83,6 +83,7 @@
   }
 
   document.addEventListener("keydown", e => {
+    if (e.altKey || e.metaKey || e.ctrlKey) return;
     const k = e.key;
     if (gridMode) {
       if (k === "ArrowRight") moveSel(1);
@@ -116,10 +117,11 @@
     requestAnimationFrame(tick);
   }
 
+  let retry = null;
   async function load() {
     try {
       const r = await fetch("manifest.json", { cache: "no-store" });
-      if (!r.ok) return;
+      if (!r.ok) throw new Error("manifest " + r.status);
       const m = await r.json();
       const np = Array.isArray(m.pages) ? m.pages : [];
       const ns = Number(m.seconds) > 0 ? Number(m.seconds) : 30;
@@ -132,6 +134,10 @@
       buildGrid();
       if (!gridMode) show();
     } catch (e) { /* keep showing last good data */ }
+    finally {
+      // No pages yet (fetch failed or empty manifest): retry soon, then rely on the hourly refresh.
+      if (!pages.length && !retry) retry = setTimeout(() => { retry = null; load(); }, 30 * 1000);
+    }
   }
 
   load();

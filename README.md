@@ -134,6 +134,10 @@ After editing the plist, run `bootout` then `bootstrap` again to pick up the cha
 - From 06:00 local time each day (a 06:00 run is scheduled, and any later run that day catches up), when no export from today is saved or in `~/Downloads` yet, the hourly job opens `https://letterboxd.com/data/export/` in your browser to fetch a fresh one, waits up to 2 minutes for the download, and uses it in the same run. The browser must be signed in to Letterboxd and set to save downloads to `~/Downloads` without asking. `make export` triggers one manually. The update prints `letterboxd export: requested a new export` when it asks, and a failed request only prints a warning on stderr.
 - If you move the repo or delete `.venv`, rerun step 4 and reload.
 
+## Gallery site
+
+The hourly job also writes a static gallery and publishes it to GitHub Pages (`gh-pages` branch). `make site` previews it from sample data into `preview-site/`; `make publish` pushes now. Setup steps: [docs/pages-setup.md](docs/pages-setup.md).
+
 ## Development
 
 ```bash

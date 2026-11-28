@@ -4,6 +4,7 @@ PIXOO_IP ?= 192.168.1.50
 RA_USER  ?= kelsin
 LB_USER  ?= kelsin13
 BGG_USER ?= Kelsin
+SITE_CNAME ?=
 
 LABEL := com.retro-pixoo.hourly
 PLIST := $(HOME)/Library/LaunchAgents/$(LABEL).plist
@@ -12,7 +13,7 @@ GUI   := gui/$(shell id -u)
 
 .DEFAULT_GOAL := help
 .PHONY: help sync test preview update keychain-ra keychain-bgg plist install \
-        uninstall reload run export status logs
+        uninstall reload run export status logs site publish
 
 help: ## Show this help
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-14s %s\n", $$1, $$2}'
@@ -25,6 +26,12 @@ test: ## Run the test suite
 
 preview: ## Render every page from sample data into preview/ (no network or device)
 	uv run retro-pixoo-update --sample --preview preview
+
+site: ## Write the gallery site from sample data into preview-site/ (no network or device)
+	uv run retro-pixoo-update --sample --site preview-site $(if $(SITE_CNAME),--site-cname $(SITE_CNAME))
+
+publish: ## Publish the live site dir to the gh-pages branch now (only if images changed)
+	scripts/publish-site.sh "$(HOME)/Library/Application Support/retro-pixoo/site"
 
 update: ## Fetch live data and push to the Pixoo (needs RA_API_KEY, PIXOO_IP)
 	uv run retro-pixoo-update
@@ -40,6 +47,7 @@ plist: ## Write the hourly launchd agent plist (uses REPO, PIXOO_IP, *_USER)
 	sed -e 's|@LABEL@|$(LABEL)|g' -e 's|@REPO@|$(REPO)|g' -e 's|@PIXOO_IP@|$(PIXOO_IP)|g' \
 	    -e 's|@RA_USER@|$(RA_USER)|g' -e 's|@LB_USER@|$(LB_USER)|g' \
 	    -e 's|@BGG_USER@|$(BGG_USER)|g' -e 's|@LOG@|$(LOG)|g' \
+	    -e 's|@SITE_CNAME@|$(SITE_CNAME)|g' \
 	    launchd/$(LABEL).plist.in > $(PLIST)
 	plutil -lint $(PLIST)
 

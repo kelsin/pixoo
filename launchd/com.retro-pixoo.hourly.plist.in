@@ -8,7 +8,7 @@
   <array>
     <string>/bin/zsh</string>
     <string>-c</string>
-    <string>RA_API_KEY="$(security find-generic-password -s retro_pixoo -a $USER -w)" BGG_TOKEN="$(security find-generic-password -s retro_pixoo_bgg -a $USER -w 2>/dev/null)" PIXOO_IP=@PIXOO_IP@ exec .venv/bin/python -u -m retro_pixoo.update --ra-user @RA_USER@ --lb-user @LB_USER@ --bgg-user @BGG_USER@</string>
+    <string>RA_API_KEY="$(security find-generic-password -s retro_pixoo -a $USER -w)" BGG_TOKEN="$(security find-generic-password -s retro_pixoo_bgg -a $USER -w 2>/dev/null)" PIXOO_IP=@PIXOO_IP@ SITE_CNAME=@SITE_CNAME@ .venv/bin/python -u -m retro_pixoo.update --ra-user @RA_USER@ --lb-user @LB_USER@ --bgg-user @BGG_USER@ --site "$HOME/Library/Application Support/retro-pixoo/site"; scripts/publish-site.sh "$HOME/Library/Application Support/retro-pixoo/site"</string>
   </array>
   <key>StartInterval</key><integer>3600</integer>
   <key>StartCalendarInterval</key>

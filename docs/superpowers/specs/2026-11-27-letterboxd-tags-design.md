@@ -7,7 +7,7 @@ Show, for four Letterboxd diary tags, how many films were logged with that tag t
 ## Goals / non-goals
 
 - Goals: one page per tag in the rotation, followed by a new "PLAY MORE VIDEO GAMES" motivation slide. The export download is requested automatically once a day.
-- Non-goals: configurable tags (they're constants in code), counts newer than the latest export, deleting old exports from `~/Downloads`.
+- Non-goals: configurable tags (they're constants in code), counts newer than the latest export.
 - Anti-goals: anything that gets around Letterboxd's bot check (headless login, browser impersonation, storing the Letterboxd password).
 
 ## Approaches
@@ -22,8 +22,9 @@ Show, for four Letterboxd diary tags, how many films were logged with that tag t
 - Count = diary rows whose tag list contains the tag and whose `Watched Date` falls in the current year. Rewatches count; each diary entry is one.
 - Most recent = the matching row with the greatest (`Watched Date`, `Date`).
 - Posters: the export has none. Match title + year against the RSS diary entries the rotation already fetches. Every RSS poster seen is saved to a JSON cache at `~/Library/Caches/retro-pixoo/posters.json`, keyed `"<title>|<year>"`. That way a tag that's been idle for a while keeps its poster after the film drops out of the 50-entry feed. If no poster is found, the page uses the existing `_placeholder`.
-- Stale export: if the newest ZIP is more than 8 days old, print a warning to stderr. That isn't an error and doesn't change the exit code.
-- No ZIP found, or the ZIP can't be read: report the error like the other sources (`letterboxd export: ...`). The tag segment and its slide are skipped, and the job exits 1.
+- Saved data: the job saves the newest complete export's `diary.csv` to `~/Library/Application Support/retro-pixoo/letterboxd-diary.json` as `{"export", "exported_at", "diary_csv"}` (written atomically; Application Support rather than Caches because it's the only copy once the ZIP is gone), then deletes that ZIP and every older `letterboxd-<lb_user>-*.zip` in the export dir. A ZIP that isn't a complete export and is newer than the newest complete one is left alone (it may still be downloading); a broken `diary.csv` raises before anything is deleted. The tag pages always read the saved data, so they keep showing the last good data until a newer export arrives.
+- Stale export: if the saved export is more than 8 days old, print a warning to stderr. That isn't an error and doesn't change the exit code.
+- No saved data and no ZIP found, or the ZIP can't be read: report the error like the other sources (`letterboxd export: ...`). The tag segment and its slide are skipped, and the job exits 1. An unreadable export dir with saved data prints `letterboxd export: can't read <dir>: <msg>; using saved data` and carries on.
 
 ## Pages (approved mockups)
 
@@ -52,7 +53,7 @@ After the BGG segment: four tag pages, then the next motivation slide. `SLIDES` 
 
 ## Daily export request
 
-- No separate agent. `main` (live mode only) calls `request_export_if_due` before collecting pages. It opens `https://letterboxd.com/data/export/` with `/usr/bin/open` from 06:00 local time, when the newest export isn't from today (its file-name UTC time converted to local) and `~/Library/Caches/retro-pixoo/export_requested` doesn't already hold today's date. The launchd job has a 06:00 `StartCalendarInterval` so a run happens at 06:00, and any later run that day catches up. A missing Downloads permission means no request (the tags source reports the real error). After requesting, the run waits up to 2 minutes for a new, complete export (a ZIP containing `diary.csv`) and uses it in the same run; if none arrives it prints `letterboxd export: no new export after 120s; using the previous one` to stderr and uses the previous export. A successful pickup prints `letterboxd export: got <name>`.
+- No separate agent. `main` (live mode only) calls `request_export_if_due` before collecting pages. It opens `https://letterboxd.com/data/export/` with `/usr/bin/open` from 06:00 local time, when neither the saved data nor the newest ZIP is from today (export UTC time converted to local) and `~/Library/Caches/retro-pixoo/export_requested` doesn't already hold today's date. The launchd job has a 06:00 `StartCalendarInterval` so a run happens at 06:00, and any later run that day catches up. A missing Downloads permission means no request (the tags source reports the real error). After requesting, the run waits up to 2 minutes for a new, complete export (a ZIP containing `diary.csv`) and uses it in the same run; if none arrives it prints `letterboxd export: no new export after 120s; using the previous one` to stderr and uses the previous export. A successful pickup prints `letterboxd export: got <name>`.
 - A failed request prints `letterboxd export: request failed: ...` to stderr and is not an error. A successful one prints `letterboxd export: requested a new export`.
 - `make export` opens the page manually; `make uninstall` and `make reload` also remove the old weekly `com.retro-pixoo.lb-export` agent if present.
 - README documents the manual steps: the browser stays signed in to Letterboxd and saves downloads to `~/Downloads`, plus a one-time **Files and Folders → Downloads** grant for the hourly job's Python (macOS blocks background jobs from reading `~/Downloads`; same kind of grant as Local Network).

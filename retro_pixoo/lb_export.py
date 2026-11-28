@@ -7,6 +7,7 @@ import os
 import re
 import subprocess
 import sys
+import tempfile
 import time
 import zipfile
 from dataclasses import dataclass
@@ -18,6 +19,7 @@ from .letterboxd import DiaryEntry
 
 CACHE_PATH = Path.home() / "Library/Caches/retro-pixoo/posters.json"
 EXPORT_URL = "https://letterboxd.com/data/export/"
+DATA_PATH = Path.home() / "Library/Application Support/retro-pixoo/letterboxd-diary.json"
 REQUEST_PATH = CACHE_PATH.parent / "export_requested"
 REQUEST_HOUR = 6
 SAMPLE_YEAR = 2026
@@ -78,10 +80,11 @@ def request_export_if_due(
     user: str,
     now: datetime,
     state_path: Path,
+    data_path: Path,
     opener: Callable[[str], None],
     hour: int = REQUEST_HOUR,
 ) -> bool:
-    """Open the export page from `hour` local time, once a day, unless an export from today is there."""
+    """Open the export page from `hour` local time, once a day, unless today's export is saved or in `directory`."""
     if now.hour < hour:
         return False
     try:
@@ -89,6 +92,9 @@ def request_export_if_due(
             return False
     except FileNotFoundError:
         pass
+    saved = load_saved(data_path)
+    if saved and saved[0].astimezone(now.tzinfo).date() >= now.date():
+        return False
     try:
         if export_time(newest_export(directory, user)).astimezone(now.tzinfo).date() >= now.date():
             return False
@@ -137,12 +143,72 @@ def load_export(path: Path) -> list[DiaryRow]:
         return parse_diary_csv(zf.read("diary.csv").decode("utf-8"))
 
 
-def load_latest(directory: Path, user: str, today: date) -> list[DiaryRow]:
-    path = newest_export(directory, user)
-    age = (today - export_time(path).astimezone().date()).days
+def save_export(data_path: Path, path: Path, csv_text: str) -> None:
+    record = {
+        "export": Path(path).name,
+        "exported_at": export_time(path).isoformat(),
+        "diary_csv": csv_text,
+    }
+    data_path.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(dir=data_path.parent, prefix=".diary-", suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            json.dump(record, f)
+        os.replace(tmp, data_path)
+    except BaseException:
+        Path(tmp).unlink(missing_ok=True)
+        raise
+
+
+def _read_saved(data_path: Path) -> tuple[str, datetime, list[DiaryRow]] | None:
+    try:
+        rec = json.loads(Path(data_path).read_text(encoding="utf-8"))
+        return (rec["export"], datetime.fromisoformat(rec["exported_at"]),
+                parse_diary_csv(rec["diary_csv"]))
+    except Exception:
+        return None
+
+
+def load_saved(data_path: Path) -> tuple[datetime, list[DiaryRow]] | None:
+    saved = _read_saved(data_path)
+    return (saved[1], saved[2]) if saved else None
+
+
+def ingest_exports(directory: Path, user: str, data_path: Path) -> str | None:
+    """Save the newest complete export if it's newer than the saved data, then delete it and older ones."""
+    os.listdir(directory)  # Path.glob swallows PermissionError; let it propagate
+    found = sorted(Path(directory).glob(f"letterboxd-{user}-[0-9][0-9][0-9][0-9]-*.zip"))
+    newest = next((p for p in reversed(found) if _is_complete_export(p)), None)
+    if newest is None:
+        return None
+    saved = load_saved(data_path)
+    took = None
+    if saved is None or export_time(newest) > saved[0]:
+        with zipfile.ZipFile(newest) as zf:
+            text = zf.read("diary.csv").decode("utf-8")
+        parse_diary_csv(text)  # a broken CSV raises before anything is deleted
+        save_export(data_path, newest, text)
+        took = newest.name
+    for p in found:
+        if p.name <= newest.name:
+            p.unlink(missing_ok=True)
+    return took
+
+
+def load_latest(directory: Path, user: str, data_path: Path, today: date) -> list[DiaryRow]:
+    try:
+        ingest_exports(directory, user, data_path)
+    except OSError as e:
+        print(f"letterboxd export: can't read {directory}: {e}; using saved data", file=sys.stderr)
+    saved = _read_saved(data_path)
+    if saved is None:
+        raise FileNotFoundError(
+            f"no saved Letterboxd export and no letterboxd-{user}-*.zip in {directory}")
+    name, exported_at, rows = saved
+    age = (today - exported_at.astimezone().date()).days
     if age > 8:
-        print(f"letterboxd export: export is {age} days old ({path.name})", file=sys.stderr)
-    return load_export(path)
+        print(f"letterboxd export: export is {age} days old ({name})", file=sys.stderr)
+    return rows
 
 
 def summarize(rows: list[DiaryRow], tag: str, year: int) -> TagSummary:

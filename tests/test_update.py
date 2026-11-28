@@ -59,6 +59,10 @@ class _TempPosterCache(unittest.TestCase):
         patcher = mock.patch("retro_pixoo.update.CACHE_PATH", Path(tmp.name) / "posters.json")
         patcher.start()
         self.addCleanup(patcher.stop)
+        self.data_path = Path(tmp.name) / "support" / "letterboxd-diary.json"
+        patcher = mock.patch("retro_pixoo.update.DATA_PATH", self.data_path)
+        patcher.start()
+        self.addCleanup(patcher.stop)
         patcher = mock.patch("retro_pixoo.update.REQUEST_PATH", Path(tmp.name) / "export_requested")
         patcher.start()
         self.addCleanup(patcher.stop)
@@ -357,17 +361,35 @@ class TagUpdateTests(_TempPosterCache):
         main(["--sample", "--send", "", "--no-preview"])
         self.open_in_browser.assert_not_called()
 
+    def test_live_main_deletes_zip_and_keeps_pages_with_empty_downloads(self):
+        runs = []
+        for _ in range(2):
+            with tempfile.TemporaryDirectory() as d, \
+                 mock.patch("retro_pixoo.update.RAClient", side_effect=RuntimeError("x")), \
+                 mock.patch("retro_pixoo.update.LetterboxdClient", side_effect=RuntimeError("y")), \
+                 mock.patch("retro_pixoo.update.tag_frames", return_value=[]) as tag_frames_mock, \
+                 mock.patch("sys.stderr", io.StringIO()), \
+                 contextlib.redirect_stdout(io.StringIO()):
+                if not runs:
+                    self.open_in_browser.side_effect = lambda url: _write_export(d, "2026-11-27")
+                main(["--send", "", "--no-preview", "--lb-export-dir", d])
+                self.assertEqual(list(Path(d).iterdir()), [])
+            runs.append(tag_frames_mock.call_args.args[0])
+        self.assertEqual(len(runs[0]), len(load_sample_diary()))
+        self.assertEqual(runs[1], runs[0])
+        self.open_in_browser.assert_called_once()
+
     def test_load_latest_stale_export_warns(self):
         with tempfile.TemporaryDirectory() as d:
             name = _write_export(d, "2026-11-01")
             err = io.StringIO()
             with contextlib.redirect_stderr(err):
-                rows = load_latest(Path(d), "kelsin13", date(2026, 11, 27))
+                rows = load_latest(Path(d), "kelsin13", self.data_path, date(2026, 11, 27))
             self.assertEqual(len(rows), len(load_sample_diary()))
             self.assertIn(f"letterboxd export: export is 26 days old ({name})", err.getvalue())
             err = io.StringIO()
             with contextlib.redirect_stderr(err):
-                load_latest(Path(d), "kelsin13", date(2026, 11, 5))
+                load_latest(Path(d), "kelsin13", self.data_path, date(2026, 11, 5))
             self.assertEqual(err.getvalue(), "")
 
 

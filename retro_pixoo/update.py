@@ -19,8 +19,8 @@ from .bgg_render import (
     bgg_h_frame, bgg_recent_frame, bgg_stats_frame, bgg_top_frame, needed_games,
 )
 from .lb_export import (
-    CACHE_PATH, REQUEST_PATH, SAMPLE_YEAR, DiaryRow, PosterCache, load_latest, load_sample_diary,
-    newest_export, open_in_browser, request_export_if_due, wait_for_new_export,
+    CACHE_PATH, DATA_PATH, REQUEST_PATH, SAMPLE_YEAR, DiaryRow, PosterCache, load_latest,
+    load_sample_diary, newest_export, open_in_browser, request_export_if_due, wait_for_new_export,
 )
 from .letterboxd import DiaryEntry, LetterboxdClient, load_sample_feed
 from .motivation import SLIDES
@@ -141,7 +141,7 @@ def main(argv: list[str] | None = None) -> int:
         ra = lambda: RAClient().profile(args.ra_user)  # noqa: E731
         lb = lambda: LetterboxdClient().diary(args.lb_user)  # noqa: E731
         bgg = None
-        tags = lambda: load_latest(args.lb_export_dir, args.lb_user, date.today())  # noqa: E731
+        tags = lambda: load_latest(args.lb_export_dir, args.lb_user, DATA_PATH, date.today())  # noqa: E731
         posters, year = PosterCache(CACHE_PATH), None
         try:
             now = datetime.now().astimezone()
@@ -150,7 +150,7 @@ def main(argv: list[str] | None = None) -> int:
             except Exception:
                 previous = None
             if request_export_if_due(args.lb_export_dir, args.lb_user, now, REQUEST_PATH,
-                                     open_in_browser):
+                                     DATA_PATH, open_in_browser):
                 print("letterboxd export: requested a new export")
                 got = wait_for_new_export(args.lb_export_dir, args.lb_user, previous)
                 if got:

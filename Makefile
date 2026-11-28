@@ -7,12 +7,15 @@ BGG_USER ?= Kelsin
 
 LABEL := com.retro-pixoo.hourly
 PLIST := $(HOME)/Library/LaunchAgents/$(LABEL).plist
+# Removed weekly export agent; uninstall/reload still clean it up
+LEGACY_LABEL := com.retro-pixoo.lb-export
+LEGACY_PLIST := $(HOME)/Library/LaunchAgents/$(LEGACY_LABEL).plist
 LOG   := $(HOME)/Library/Logs/retro-pixoo.log
 GUI   := gui/$(shell id -u)
 
 .DEFAULT_GOAL := help
 .PHONY: help sync test preview update keychain-ra keychain-bgg plist install \
-        uninstall reload run status logs
+        uninstall reload run export status logs
 
 help: ## Show this help
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-14s %s\n", $$1, $$2}'
@@ -43,20 +46,26 @@ plist: ## Write the hourly launchd agent plist (uses REPO, PIXOO_IP, *_USER)
 	    launchd/$(LABEL).plist.in > $(PLIST)
 	plutil -lint $(PLIST)
 
-install: sync plist ## Sync deps, write the plist and load it (runs once now, then hourly)
+install: sync plist ## Sync deps, write the plist and load it (hourly update runs once now)
 	launchctl bootstrap $(GUI) $(PLIST)
 
 uninstall: ## Stop and unload the agent, delete its plist
 	-launchctl bootout $(GUI)/$(LABEL)
-	rm -f $(PLIST)
+	-launchctl bootout $(GUI)/$(LEGACY_LABEL)
+	rm -f $(PLIST) $(LEGACY_PLIST)
 
 reload: ## Rewrite the plist and reload the agent (after changing settings)
 	-launchctl bootout $(GUI)/$(LABEL)
+	-launchctl bootout $(GUI)/$(LEGACY_LABEL)
+	rm -f $(LEGACY_PLIST)
 	$(MAKE) plist
 	launchctl bootstrap $(GUI) $(PLIST)
 
 run: ## Run the agent now
 	launchctl kickstart -k $(GUI)/$(LABEL)
+
+export: ## Download a Letterboxd export now (opens the browser)
+	open https://letterboxd.com/data/export/
 
 status: ## Show agent status and last exit code
 	launchctl print $(GUI)/$(LABEL)

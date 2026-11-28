@@ -8,7 +8,7 @@ from __future__ import annotations
 import argparse
 import os
 import sys
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
 from typing import Callable
 
@@ -18,10 +18,15 @@ from .bgg import BggClient, Play, load_sample_plays
 from .bgg_render import (
     bgg_h_frame, bgg_recent_frame, bgg_stats_frame, bgg_top_frame, needed_games,
 )
+from .lb_export import (
+    CACHE_PATH, DATA_PATH, REQUEST_PATH, SAMPLE_YEAR, DiaryRow, PosterCache, load_latest,
+    load_sample_diary, newest_export, open_in_browser, request_export_if_due, wait_for_new_export,
+)
 from .letterboxd import DiaryEntry, LetterboxdClient, load_sample_feed
 from .motivation import SLIDES
 from .pixoo import Pixoo
 from .ra import ImageFetcher, Profile, RAClient, load_sample
+from .tags_render import tag_frames
 from .render import (
     diary_frame, last_watched_frame, led_preview, month_stats_frame, profile_frame, recent_frame,
     recent_games_frame, systems_frame, watch_calendar_frame,
@@ -42,6 +47,9 @@ def collect_pages(
     bgg: Callable[[], list[Play]] | None = None,
     bgg_pages: tuple[str, ...] = tuple(BGG_PAGES),
     bgg_thumbs: Callable[[list[int]], dict[int, str]] | None = None,
+    tags: Callable[[], list[DiaryRow]] | None = None,
+    posters: PosterCache | None = None,
+    year: int | None = None,
 ) -> tuple[list[Image.Image], list[str]]:
     errors: list[str] = []
     profile = entries = None
@@ -53,6 +61,11 @@ def collect_pages(
         entries = lb()
     except Exception as e:
         errors.append(f"letterboxd: {str(e) or type(e).__name__}")
+    if posters is not None and entries:
+        try:
+            posters.update(entries)
+        except Exception:
+            pass  # the poster cache is optional
     plays = None
     if bgg is not None:
         try:
@@ -83,6 +96,15 @@ def collect_pages(
                 thumbs = {}  # images are optional; identicons fill in
         pages.extend(BGG_PAGES[name](plays, thumbs=thumbs, fetcher=fetcher) for name in bgg_pages)
         pages.append(next(slides)())
+    if tags is not None:
+        try:
+            rows = tags()
+        except Exception as e:
+            errors.append(f"letterboxd export: {str(e) or type(e).__name__}")
+        else:
+            poster_for = posters.get if posters else (lambda t, y: "")
+            pages.extend(tag_frames(rows, poster_for, fetcher, year or date.today().year))
+            pages.append(next(slides)())
     return pages, errors
 
 
@@ -93,6 +115,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--bgg-user", default="Kelsin")
     ap.add_argument("--bgg-pages", default=",".join(BGG_PAGES),
                     help="comma list of BGG pages: " + ",".join(BGG_PAGES))
+    ap.add_argument("--lb-export-dir", type=Path, default=Path.home() / "Downloads",
+                    help="folder holding the Letterboxd data export zip (default: ~/Downloads)")
     ap.add_argument("--sample", action="store_true", help="use bundled sample data, no network")
     ap.add_argument("--preview", type=Path, default=Path("preview"),
                     help="write PNG/GIF previews to this directory (default: preview)")
@@ -111,16 +135,37 @@ def main(argv: list[str] | None = None) -> int:
         fetcher = ImageFetcher(offline=True)
         ra, lb = load_sample, load_sample_feed
         bgg = load_sample_plays
+        tags, posters, year = load_sample_diary, PosterCache(None), SAMPLE_YEAR
     else:
         fetcher = ImageFetcher()
         ra = lambda: RAClient().profile(args.ra_user)  # noqa: E731
         lb = lambda: LetterboxdClient().diary(args.lb_user)  # noqa: E731
         bgg = None
+        tags = lambda: load_latest(args.lb_export_dir, args.lb_user, DATA_PATH, date.today())  # noqa: E731
+        posters, year = PosterCache(CACHE_PATH), None
+        try:
+            now = datetime.now().astimezone()
+            try:
+                previous = newest_export(args.lb_export_dir, args.lb_user).name
+            except Exception:
+                previous = None
+            if request_export_if_due(args.lb_export_dir, args.lb_user, now, REQUEST_PATH,
+                                     DATA_PATH, open_in_browser):
+                print("letterboxd export: requested a new export")
+                got = wait_for_new_export(args.lb_export_dir, args.lb_user, previous)
+                if got:
+                    print(f"letterboxd export: got {got.name}")
+                else:
+                    print("letterboxd export: no new export after 120s; using saved data",
+                          file=sys.stderr)
+        except Exception as e:
+            print(f"letterboxd export: request failed: {str(e) or type(e).__name__}",
+                  file=sys.stderr)
         if os.environ.get("BGG_TOKEN"):
             bgg = lambda: BggClient().plays(args.bgg_user, date.today().year)  # noqa: E731
 
     bgg_thumbs = None if args.sample else BggClient().thumbnails
-    pages, errors = collect_pages(ra, lb, fetcher, bgg, bgg_pages, bgg_thumbs)
+    pages, errors = collect_pages(ra, lb, fetcher, bgg, bgg_pages, bgg_thumbs, tags, posters, year)
     for err in errors:
         print(err, file=sys.stderr)
     if not pages:

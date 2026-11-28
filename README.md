@@ -39,7 +39,7 @@ uv run retro-pixoo-update --bgg-user Kelsin --bgg-pages h,top
 
 | Command | What it does |
 | --- | --- |
-| `retro-pixoo-update` | One shot: RA profile, recent unlocks, recent games, top systems, Letterboxd last watched film, recent diary, this month's stats, then the four BGG pages when `BGG_TOKEN` is set. A motivation slide (voice, scroll, breathe) follows each source's pages. 30s per page (`--seconds`). |
+| `retro-pixoo-update` | One shot: RA profile, recent unlocks, recent games, top systems, Letterboxd last watched film, recent diary, this month's stats, then the four BGG pages when `BGG_TOKEN` is set. Letterboxd also gets four tag pages (FRIDA, REGAL, KERRIGAN, CAITLIN: this year's count and most recent film, read from the newest `letterboxd-<user>-*.zip` data export in `~/Downloads`, see `--lb-export-dir`; the job saves its `diary.csv` to `~/Library/Application Support/retro-pixoo/letterboxd-diary.json` and deletes the ZIP, so the pages keep showing the last good data until a newer export arrives). A motivation slide (voice, scroll, breathe, handhelds) follows each source's pages. 30s per page (`--seconds`). |
 | `retro-pixoo` | RA profile, recent unlocks, recent games and top systems only. `--loop MIN` keeps refreshing (minimum 5). |
 
 Common flags: `--sample`, `--preview DIR` (`retro-pixoo-update` always writes PNGs and a GIF of every page to `preview/` by default, even when sending; `--no-preview` skips it), `--send IP` (defaults to `$PIXOO_IP`), `--endpoint /divoom_api` (if your firmware doesn't answer on `/post`). Users: `--ra-user` and `--lb-user` for `retro-pixoo-update`, `--user` for `retro-pixoo`.
@@ -48,7 +48,7 @@ If one source fails, `retro-pixoo-update` still shows the other source's pages a
 
 ## Run every hour on a Mac
 
-Shortcut: `make keychain-ra keychain-bgg install` does steps 1, 2, 2b, 4 and 5 below (override with `make install PIXOO_IP=... RA_USER=... LB_USER=... BGG_USER=...`). Then `make run`, `status`, `logs`, `reload` and `uninstall` manage it; `make help` lists everything.
+Shortcut: `make keychain-ra keychain-bgg install` does steps 1, 2, 2b, 4 and 5 below (override with `make install PIXOO_IP=... RA_USER=... LB_USER=... BGG_USER=...`). Then `make run`, `status`, `logs`, `reload` and `uninstall` manage it; `make help` lists everything. Already installed? Run `make reload PIXOO_IP=<your ip>` instead (`make install` would fail at the already-loaded bootstrap). `reload` rewrites the plist from the Makefile defaults, so pass your `PIXOO_IP` and any `RA_USER`, `LB_USER`, `BGG_USER` that differ.
 
 Run `retro-pixoo-update` from a launchd agent rather than cron or `--loop`: launchd starts it at login, catches up after sleep, and each run is a fresh process, so one failure can't wedge the next hour.
 
@@ -130,6 +130,8 @@ After editing the plist, run `bootout` then `bootstrap` again to pick up the cha
 
 - The agent only runs while you're logged in, which is what you want for a desk display. If the Mac is asleep, launchd runs one catch-up update on wake instead of one per missed hour.
 - Keep the repo out of `~/Documents`, `~/Desktop` and `~/Downloads`. macOS privacy protection blocks background jobs from reading those folders, and the job fails with `Operation not permitted`.
+- The Letterboxd tag pages read the data export from `~/Downloads`, so the hourly job's Python (the `.venv` python, which resolves to python3.13) needs a one-time System Settings → Privacy & Security → Files and Folders → Downloads Folder grant. The job deletes the `letterboxd-<user>-*.zip` exports it has used (and older ones) from `~/Downloads`, after saving their `diary.csv` to `~/Library/Application Support/retro-pixoo/letterboxd-diary.json` (the only copy once the ZIP is gone, so it lives outside Caches). Without a ZIP, or when Downloads can't be read, the tag pages keep using that saved data; they're skipped only on a machine that has never had an export. The update warns on stderr when the saved export is more than 8 days old.
+- From 06:00 local time each day (a 06:00 run is scheduled, and any later run that day catches up), when no export from today is saved or in `~/Downloads` yet, the hourly job opens `https://letterboxd.com/data/export/` in your browser to fetch a fresh one, waits up to 2 minutes for the download, and uses it in the same run. The browser must be signed in to Letterboxd and set to save downloads to `~/Downloads` without asking. `make export` triggers one manually. The update prints `letterboxd export: requested a new export` when it asks, and a failed request only prints a warning on stderr.
 - If you move the repo or delete `.venv`, rerun step 4 and reload.
 
 ## Development

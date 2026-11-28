@@ -19,4 +19,4 @@ Python scripts that customize the screen of a **Divoom Pixoo-64** (64x64 RGB LED
 
 ## Existing scripts
 
-- `retro_pixoo/`: RetroAchievements profile + recent unlocks pages. Run `uv run retro-pixoo --sample --preview preview` to preview offline. See `README.md`.
+- `retro_pixoo/`: RetroAchievements profile + recent unlocks pages, plus Letterboxd tag pages read from the data export in `~/Downloads` (the hourly job asks the browser for a fresh export from 06:00 local time and uses it in the same run, saves `diary.csv` to `~/Library/Application Support/retro-pixoo/letterboxd-diary.json`, then deletes the ZIPs; the pages keep showing the last good data). Run `uv run retro-pixoo --sample --preview preview` to preview offline. See `README.md`.

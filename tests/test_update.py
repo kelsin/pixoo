@@ -1,6 +1,9 @@
+import contextlib
 import io
 import tempfile
+import zipfile
 import unittest
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from unittest import mock
 
@@ -8,13 +11,18 @@ from retro_pixoo.bgg import load_sample_plays
 from retro_pixoo.bgg_render import (
     bgg_h_frame, bgg_recent_frame, bgg_stats_frame, bgg_top_frame,
 )
+from retro_pixoo import lb_export
+from retro_pixoo.lb_export import (
+    SAMPLE_YEAR, PosterCache, load_latest, load_sample_diary, parse_diary_csv,
+)
 from retro_pixoo.letterboxd import load_sample_feed
-from retro_pixoo.motivation import breathe_frame, scroll_frame, voice_frame
+from retro_pixoo.motivation import breathe_frame, handhelds_frame, scroll_frame, voice_frame
 from retro_pixoo.ra import ImageFetcher, load_sample
 from retro_pixoo.render import (
     diary_frame, last_watched_frame, month_stats_frame, profile_frame, recent_frame, recent_games_frame,
     systems_frame, watch_calendar_frame,
 )
+from retro_pixoo.tags_render import tag_frames
 from retro_pixoo import render
 from retro_pixoo.update import collect_pages, main
 
@@ -25,8 +33,65 @@ def _boom(msg):
     return f
 
 
-class UpdateTests(unittest.TestCase):
+SAMPLE_CSV = Path(__file__).parent.parent / "retro_pixoo" / "sample_diary.csv"
+
+
+OLD_CSV = (
+    "Date,Name,Year,Letterboxd URI,Rating,Rewatch,Tags,Watched Date\n"
+    "2026-11-17,Wildwood,2026,u,5,,theater:frida,2026-11-16\n"
+)
+
+
+def _write_export(directory, day, csv_text=None):
+    """Write a Letterboxd export zip dated `day` holding the sample diary.csv; return its name."""
+    name = f"letterboxd-kelsin13-{day}-12-00-utc.zip"
+    with zipfile.ZipFile(Path(directory) / name, "w") as zf:
+        zf.writestr("diary.csv", csv_text or SAMPLE_CSV.read_text(encoding="utf-8"))
+    return name
+
+
+class _TempPosterCache(unittest.TestCase):
+    """Live-mode main() builds PosterCache(CACHE_PATH); keep it off the real cache file."""
+
     def setUp(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        patcher = mock.patch("retro_pixoo.update.CACHE_PATH", Path(tmp.name) / "posters.json")
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        self.data_path = Path(tmp.name) / "support" / "letterboxd-diary.json"
+        patcher = mock.patch("retro_pixoo.update.DATA_PATH", self.data_path)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        patcher = mock.patch("retro_pixoo.update.REQUEST_PATH", Path(tmp.name) / "export_requested")
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        patcher = mock.patch("retro_pixoo.update.open_in_browser")
+        self.open_in_browser = patcher.start()
+        self.addCleanup(patcher.stop)
+        # a fixed local "now" (after 06:00) and a fake clock so waiting never sleeps for real
+        fixed = datetime(2026, 11, 27, 9, 0, tzinfo=timezone(timedelta(hours=-8)))
+        patcher = mock.patch("retro_pixoo.update.datetime")
+        patcher.start().now.return_value.astimezone.return_value = fixed
+        self.addCleanup(patcher.stop)
+        self.fake_now = 0.0
+        self.waits = []
+
+        def sleep(seconds):
+            self.waits.append(seconds)
+            self.fake_now += seconds
+
+        real_wait = lb_export.wait_for_new_export
+        patcher = mock.patch(
+            "retro_pixoo.update.wait_for_new_export",
+            lambda *a, **kw: real_wait(*a, sleep=sleep, clock=lambda: self.fake_now, **kw))
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+
+class UpdateTests(_TempPosterCache):
+    def setUp(self):
+        super().setUp()
         self.fetcher = ImageFetcher(offline=True)
 
     def test_both_sources_order(self):
@@ -71,8 +136,9 @@ class UpdateTests(unittest.TestCase):
     def test_main_no_pages_does_not_send(self):
         with mock.patch("retro_pixoo.update.RAClient", side_effect=RuntimeError("x")), \
              mock.patch("retro_pixoo.update.LetterboxdClient", side_effect=RuntimeError("y")), \
-             mock.patch("retro_pixoo.update.Pixoo") as pixoo:
-            self.assertEqual(main(["--send", "1.2.3.4"]), 1)
+             mock.patch("retro_pixoo.update.Pixoo") as pixoo, \
+             tempfile.TemporaryDirectory() as empty:
+            self.assertEqual(main(["--send", "1.2.3.4", "--no-preview", "--lb-export-dir", empty]), 1)
             pixoo.assert_not_called()
 
     def test_main_send_failure_returns_1(self):
@@ -96,8 +162,9 @@ class UpdateTests(unittest.TestCase):
         self.assertEqual(errors, ["letterboxd: TimeoutError"])
 
 
-class BggUpdateTests(unittest.TestCase):
+class BggUpdateTests(_TempPosterCache):
     def setUp(self):
+        super().setUp()
         self.fetcher = ImageFetcher(offline=True)
         self.p, self.e = load_sample(), load_sample_feed()
         self.plays = load_sample_plays()
@@ -166,16 +233,16 @@ class BggUpdateTests(unittest.TestCase):
         self.assertEqual(errors, [])
         self.assertEqual(len(pages), 15)
 
-    def test_main_sample_writes_fifteen_pages(self):
+    def test_main_sample_writes_twenty_pages(self):
         with tempfile.TemporaryDirectory() as d:
             self.assertEqual(main(["--sample", "--preview", d, "--send", ""]), 0)
-            self.assertEqual(len(list(Path(d).glob("page*_64.png"))), 15)
+            self.assertEqual(len(list(Path(d).glob("page*_64.png"))), 20)
 
     def test_main_bgg_pages_subset(self):
         with tempfile.TemporaryDirectory() as d:
             self.assertEqual(
                 main(["--sample", "--bgg-pages", "top,h", "--preview", d, "--send", ""]), 0)
-            self.assertEqual(len(list(Path(d).glob("page*_64.png"))), 13)
+            self.assertEqual(len(list(Path(d).glob("page*_64.png"))), 18)
 
     def test_main_unknown_bgg_page(self):
         with mock.patch("sys.stderr", new_callable=io.StringIO), \
@@ -190,8 +257,140 @@ class BggUpdateTests(unittest.TestCase):
             env.pop("BGG_TOKEN", None)
             ra.return_value.profile.return_value = load_sample()
             lb.return_value.diary.return_value = load_sample_feed()
-            self.assertEqual(main(["--send", ""]), 0)
+            with tempfile.TemporaryDirectory() as d:
+                _write_export(d, f"{date.today():%Y-%m-%d}")
+                self.assertEqual(main(["--send", "", "--no-preview", "--lb-export-dir", d]), 0)
         self.assertEqual(err.getvalue(), "")
+
+
+class TagUpdateTests(_TempPosterCache):
+    def setUp(self):
+        super().setUp()
+        self.fetcher = ImageFetcher(offline=True)
+        self.p, self.e = load_sample(), load_sample_feed()
+        self.plays = load_sample_plays()
+
+    def _collect(self, **kw):
+        return collect_pages(lambda: self.p, lambda: self.e, self.fetcher, bgg=lambda: self.plays,
+                             posters=PosterCache(None), year=SAMPLE_YEAR, **kw)
+
+    def test_tag_pages_after_bgg(self):
+        pages, errors = self._collect(tags=load_sample_diary)
+        self.assertEqual(errors, [])
+        self.assertEqual(len(pages), 20)
+        want = tag_frames(load_sample_diary(), PosterCache(None).get, self.fetcher, SAMPLE_YEAR)
+        for got, w in zip(pages[15:19], want):
+            self.assertEqual(got.tobytes(), w.tobytes())
+        self.assertEqual(pages[19].tobytes(), handhelds_frame().tobytes())
+
+    def test_tags_failure_reported(self):
+        pages, errors = self._collect(tags=_boom("no export"))
+        self.assertEqual(len(pages), 15)
+        self.assertIn("letterboxd export: no export", errors)
+
+    def test_rss_posters_feed_the_cache(self):
+        cache = PosterCache(None)
+        collect_pages(_boom("x"), lambda: self.e, self.fetcher,
+                      tags=load_sample_diary, posters=cache, year=SAMPLE_YEAR)
+        self.assertEqual(cache.get(self.e[0].title, self.e[0].year), self.e[0].poster_url)
+
+    def test_poster_cache_failure_is_ignored(self):
+        cache = mock.Mock(wraps=PosterCache(None))
+        cache.update.side_effect = OSError("read-only")
+        pages, errors = collect_pages(
+            lambda: self.p, lambda: self.e, self.fetcher, bgg=lambda: self.plays,
+            tags=load_sample_diary, posters=cache, year=SAMPLE_YEAR)
+        self.assertEqual(errors, [])
+        self.assertEqual(len(pages), 20)
+
+    def test_live_main_requests_export_when_none(self):
+        out = io.StringIO()
+        with tempfile.TemporaryDirectory() as d, \
+             mock.patch("retro_pixoo.update.RAClient", side_effect=RuntimeError("x")), \
+             mock.patch("retro_pixoo.update.LetterboxdClient", side_effect=RuntimeError("y")), \
+             mock.patch("sys.stderr", new_callable=io.StringIO), \
+             contextlib.redirect_stdout(out):
+            main(["--send", "", "--no-preview", "--lb-export-dir", d])
+        self.open_in_browser.assert_called_once_with("https://letterboxd.com/data/export/")
+        self.assertIn("letterboxd export: requested a new export", out.getvalue())
+
+    def test_live_main_uses_new_export_in_the_same_run(self):
+        out, err = io.StringIO(), io.StringIO()
+        with tempfile.TemporaryDirectory() as d, \
+             mock.patch("retro_pixoo.update.RAClient", side_effect=RuntimeError("x")), \
+             mock.patch("retro_pixoo.update.LetterboxdClient", side_effect=RuntimeError("y")), \
+             mock.patch("retro_pixoo.update.tag_frames", return_value=[]) as tag_frames_mock, \
+             mock.patch("sys.stderr", err), contextlib.redirect_stdout(out):
+            old = _write_export(d, "2026-11-20", csv_text=OLD_CSV)
+            self.open_in_browser.side_effect = lambda url: _write_export(d, "2026-11-27")
+            main(["--send", "", "--no-preview", "--lb-export-dir", d])
+        rows = tag_frames_mock.call_args.args[0]
+        self.assertEqual(len(rows), len(load_sample_diary()))
+        self.assertNotEqual(len(rows), len(parse_diary_csv(OLD_CSV)))
+        self.assertIn("letterboxd export: requested a new export", out.getvalue())
+        self.assertIn("letterboxd export: got letterboxd-kelsin13-2026-11-27-12-00-utc.zip",
+                      out.getvalue())
+        self.assertNotIn(old, out.getvalue())
+        self.assertNotIn("no new export", err.getvalue())
+
+    def test_live_main_no_new_export_uses_previous_and_warns(self):
+        out, err = io.StringIO(), io.StringIO()
+        with tempfile.TemporaryDirectory() as d, \
+             mock.patch("retro_pixoo.update.RAClient", side_effect=RuntimeError("x")), \
+             mock.patch("retro_pixoo.update.LetterboxdClient", side_effect=RuntimeError("y")), \
+             mock.patch("retro_pixoo.update.tag_frames", return_value=[]) as tag_frames_mock, \
+             mock.patch("sys.stderr", err), contextlib.redirect_stdout(out):
+            _write_export(d, "2026-11-20", csv_text=OLD_CSV)
+            main(["--send", "", "--no-preview", "--lb-export-dir", d])
+        self.assertEqual(len(tag_frames_mock.call_args.args[0]), len(parse_diary_csv(OLD_CSV)))
+        self.assertIn("letterboxd export: no new export after 120s; using saved data",
+                      err.getvalue())
+        self.assertGreaterEqual(sum(self.waits), 120)
+
+    def test_live_main_request_failure_is_not_an_error(self):
+        self.open_in_browser.side_effect = OSError("no open")
+        err = io.StringIO()
+        with tempfile.TemporaryDirectory() as d, \
+             mock.patch("retro_pixoo.update.RAClient", side_effect=RuntimeError("x")), \
+             mock.patch("retro_pixoo.update.LetterboxdClient", side_effect=RuntimeError("y")), \
+             mock.patch("sys.stderr", err):
+            main(["--send", "", "--no-preview", "--lb-export-dir", d])
+        self.assertIn("letterboxd export: request failed: no open", err.getvalue())
+
+    def test_sample_main_never_requests_export(self):
+        main(["--sample", "--send", "", "--no-preview"])
+        self.open_in_browser.assert_not_called()
+
+    def test_live_main_deletes_zip_and_keeps_pages_with_empty_downloads(self):
+        runs = []
+        for _ in range(2):
+            with tempfile.TemporaryDirectory() as d, \
+                 mock.patch("retro_pixoo.update.RAClient", side_effect=RuntimeError("x")), \
+                 mock.patch("retro_pixoo.update.LetterboxdClient", side_effect=RuntimeError("y")), \
+                 mock.patch("retro_pixoo.update.tag_frames", return_value=[]) as tag_frames_mock, \
+                 mock.patch("sys.stderr", io.StringIO()), \
+                 contextlib.redirect_stdout(io.StringIO()):
+                if not runs:
+                    self.open_in_browser.side_effect = lambda url: _write_export(d, "2026-11-27")
+                main(["--send", "", "--no-preview", "--lb-export-dir", d])
+                self.assertEqual(list(Path(d).iterdir()), [])
+            runs.append(tag_frames_mock.call_args.args[0])
+        self.assertEqual(len(runs[0]), len(load_sample_diary()))
+        self.assertEqual(runs[1], runs[0])
+        self.open_in_browser.assert_called_once()
+
+    def test_load_latest_stale_export_warns(self):
+        with tempfile.TemporaryDirectory() as d:
+            name = _write_export(d, "2026-11-01")
+            err = io.StringIO()
+            with contextlib.redirect_stderr(err):
+                rows = load_latest(Path(d), "kelsin13", self.data_path, date(2026, 11, 27))
+            self.assertEqual(len(rows), len(load_sample_diary()))
+            self.assertIn(f"letterboxd export: export is 26 days old ({name})", err.getvalue())
+            err = io.StringIO()
+            with contextlib.redirect_stderr(err):
+                load_latest(Path(d), "kelsin13", self.data_path, date(2026, 11, 5))
+            self.assertEqual(err.getvalue(), "")
 
 
 if __name__ == "__main__":

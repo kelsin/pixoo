@@ -343,7 +343,7 @@ class TagUpdateTests(_TempPosterCache):
             _write_export(d, "2026-11-20", csv_text=OLD_CSV)
             main(["--send", "", "--no-preview", "--lb-export-dir", d])
         self.assertEqual(len(tag_frames_mock.call_args.args[0]), len(parse_diary_csv(OLD_CSV)))
-        self.assertIn("letterboxd export: no new export after 120s; using the previous one",
+        self.assertIn("letterboxd export: no new export after 120s; using saved data",
                       err.getvalue())
         self.assertGreaterEqual(sum(self.waits), 120)
 

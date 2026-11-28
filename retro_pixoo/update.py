@@ -156,7 +156,7 @@ def main(argv: list[str] | None = None) -> int:
                 if got:
                     print(f"letterboxd export: got {got.name}")
                 else:
-                    print("letterboxd export: no new export after 120s; using the previous one",
+                    print("letterboxd export: no new export after 120s; using saved data",
                           file=sys.stderr)
         except Exception as e:
             print(f"letterboxd export: request failed: {str(e) or type(e).__name__}",

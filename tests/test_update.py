@@ -7,13 +7,11 @@ from datetime import date
 from pathlib import Path
 from unittest import mock
 
-from retro_pixoo.lb_export import SAMPLE_YEAR, PosterCache, load_latest, load_sample_diary
-from retro_pixoo.tags_render import tag_frames
-
 from retro_pixoo.bgg import load_sample_plays
 from retro_pixoo.bgg_render import (
     bgg_h_frame, bgg_recent_frame, bgg_stats_frame, bgg_top_frame,
 )
+from retro_pixoo.lb_export import SAMPLE_YEAR, PosterCache, load_latest, load_sample_diary
 from retro_pixoo.letterboxd import load_sample_feed
 from retro_pixoo.motivation import breathe_frame, handhelds_frame, scroll_frame, voice_frame
 from retro_pixoo.ra import ImageFetcher, load_sample
@@ -21,6 +19,7 @@ from retro_pixoo.render import (
     diary_frame, last_watched_frame, month_stats_frame, profile_frame, recent_frame, recent_games_frame,
     systems_frame, watch_calendar_frame,
 )
+from retro_pixoo.tags_render import tag_frames
 from retro_pixoo import render
 from retro_pixoo.update import collect_pages, main
 
@@ -31,8 +30,31 @@ def _boom(msg):
     return f
 
 
-class UpdateTests(unittest.TestCase):
+SAMPLE_CSV = Path(__file__).parent.parent / "retro_pixoo" / "sample_diary.csv"
+
+
+def _write_export(directory, day):
+    """Write a Letterboxd export zip dated `day` holding the sample diary.csv; return its name."""
+    name = f"letterboxd-kelsin13-{day}-00-00-utc.zip"
+    with zipfile.ZipFile(Path(directory) / name, "w") as zf:
+        zf.writestr("diary.csv", SAMPLE_CSV.read_text(encoding="utf-8"))
+    return name
+
+
+class _TempPosterCache(unittest.TestCase):
+    """Live-mode main() builds PosterCache(CACHE_PATH); keep it off the real cache file."""
+
     def setUp(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        patcher = mock.patch("retro_pixoo.update.CACHE_PATH", Path(tmp.name) / "posters.json")
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+
+class UpdateTests(_TempPosterCache):
+    def setUp(self):
+        super().setUp()
         self.fetcher = ImageFetcher(offline=True)
 
     def test_both_sources_order(self):
@@ -103,8 +125,9 @@ class UpdateTests(unittest.TestCase):
         self.assertEqual(errors, ["letterboxd: TimeoutError"])
 
 
-class BggUpdateTests(unittest.TestCase):
+class BggUpdateTests(_TempPosterCache):
     def setUp(self):
+        super().setUp()
         self.fetcher = ImageFetcher(offline=True)
         self.p, self.e = load_sample(), load_sample_feed()
         self.plays = load_sample_plays()
@@ -198,10 +221,7 @@ class BggUpdateTests(unittest.TestCase):
             ra.return_value.profile.return_value = load_sample()
             lb.return_value.diary.return_value = load_sample_feed()
             with tempfile.TemporaryDirectory() as d:
-                name = f"letterboxd-kelsin13-{date.today():%Y-%m-%d}-00-00-utc.zip"
-                with zipfile.ZipFile(Path(d) / name, "w") as zf:
-                    zf.writestr("diary.csv", (Path(__file__).parent.parent / "retro_pixoo"
-                                              / "sample_diary.csv").read_text(encoding="utf-8"))
+                _write_export(d, f"{date.today():%Y-%m-%d}")
                 self.assertEqual(main(["--send", "", "--no-preview", "--lb-export-dir", d]), 0)
         self.assertEqual(err.getvalue(), "")
 
@@ -247,10 +267,7 @@ class TagUpdateTests(unittest.TestCase):
 
     def test_load_latest_stale_export_warns(self):
         with tempfile.TemporaryDirectory() as d:
-            name = "letterboxd-kelsin13-2026-11-01-00-00-utc.zip"
-            with zipfile.ZipFile(Path(d) / name, "w") as zf:
-                zf.writestr("diary.csv", (Path(__file__).parent.parent / "retro_pixoo"
-                                          / "sample_diary.csv").read_text(encoding="utf-8"))
+            name = _write_export(d, "2026-11-01")
             err = io.StringIO()
             with contextlib.redirect_stderr(err):
                 rows = load_latest(Path(d), "kelsin13", date(2026, 11, 27))

@@ -7,9 +7,6 @@ BGG_USER ?= Kelsin
 
 LABEL := com.retro-pixoo.hourly
 PLIST := $(HOME)/Library/LaunchAgents/$(LABEL).plist
-# Removed weekly export agent; uninstall/reload still clean it up
-LEGACY_LABEL := com.retro-pixoo.lb-export
-LEGACY_PLIST := $(HOME)/Library/LaunchAgents/$(LEGACY_LABEL).plist
 LOG   := $(HOME)/Library/Logs/retro-pixoo.log
 GUI   := gui/$(shell id -u)
 
@@ -51,13 +48,10 @@ install: sync plist ## Sync deps, write the plist and load it (hourly update run
 
 uninstall: ## Stop and unload the agent, delete its plist
 	-launchctl bootout $(GUI)/$(LABEL)
-	-launchctl bootout $(GUI)/$(LEGACY_LABEL)
-	rm -f $(PLIST) $(LEGACY_PLIST)
+	rm -f $(PLIST)
 
 reload: ## Rewrite the plist and reload the agent (after changing settings)
 	-launchctl bootout $(GUI)/$(LABEL)
-	-launchctl bootout $(GUI)/$(LEGACY_LABEL)
-	rm -f $(LEGACY_PLIST)
 	$(MAKE) plist
 	launchctl bootstrap $(GUI) $(PLIST)
 

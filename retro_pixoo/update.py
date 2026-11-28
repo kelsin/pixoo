@@ -8,7 +8,7 @@ from __future__ import annotations
 import argparse
 import os
 import sys
-from datetime import date, datetime, timezone
+from datetime import date, datetime
 from pathlib import Path
 from typing import Callable
 
@@ -20,7 +20,7 @@ from .bgg_render import (
 )
 from .lb_export import (
     CACHE_PATH, REQUEST_PATH, SAMPLE_YEAR, DiaryRow, PosterCache, load_latest, load_sample_diary,
-    open_in_browser, request_export_if_due,
+    newest_export, open_in_browser, request_export_if_due, wait_for_new_export,
 )
 from .letterboxd import DiaryEntry, LetterboxdClient, load_sample_feed
 from .motivation import SLIDES
@@ -144,10 +144,20 @@ def main(argv: list[str] | None = None) -> int:
         tags = lambda: load_latest(args.lb_export_dir, args.lb_user, date.today())  # noqa: E731
         posters, year = PosterCache(CACHE_PATH), None
         try:
-            if request_export_if_due(args.lb_export_dir, args.lb_user,
-                                     datetime.now(timezone.utc).date(), REQUEST_PATH,
+            now = datetime.now().astimezone()
+            try:
+                previous = newest_export(args.lb_export_dir, args.lb_user).name
+            except Exception:
+                previous = None
+            if request_export_if_due(args.lb_export_dir, args.lb_user, now, REQUEST_PATH,
                                      open_in_browser):
                 print("letterboxd export: requested a new export")
+                got = wait_for_new_export(args.lb_export_dir, args.lb_user, previous)
+                if got:
+                    print(f"letterboxd export: got {got.name}")
+                else:
+                    print("letterboxd export: no new export after 120s; using the previous one",
+                          file=sys.stderr)
         except Exception as e:
             print(f"letterboxd export: request failed: {str(e) or type(e).__name__}",
                   file=sys.stderr)

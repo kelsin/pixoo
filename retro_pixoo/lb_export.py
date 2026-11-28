@@ -7,9 +7,10 @@ import os
 import re
 import subprocess
 import sys
+import time
 import zipfile
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Callable
 
@@ -18,6 +19,7 @@ from .letterboxd import DiaryEntry
 CACHE_PATH = Path.home() / "Library/Caches/retro-pixoo/posters.json"
 EXPORT_URL = "https://letterboxd.com/data/export/"
 REQUEST_PATH = CACHE_PATH.parent / "export_requested"
+REQUEST_HOUR = 6
 SAMPLE_YEAR = 2026
 SAMPLE_PATH = Path(__file__).parent / "sample_diary.csv"
 
@@ -62,9 +64,9 @@ def newest_export(directory: Path, user: str) -> Path:
     return found[-1]
 
 
-def export_date(path: Path) -> date:
-    m = re.search(r"(\d{4})-(\d{2})-(\d{2})", Path(path).name)
-    return date(int(m[1]), int(m[2]), int(m[3]))
+def export_time(path: Path) -> datetime:
+    m = re.search(r"(\d{4})-(\d{2})-(\d{2})-(\d{2})-(\d{2})-utc", Path(path).name)
+    return datetime(*(int(g) for g in m.groups()), tzinfo=timezone.utc)
 
 
 def open_in_browser(url: str) -> None:
@@ -74,27 +76,60 @@ def open_in_browser(url: str) -> None:
 def request_export_if_due(
     directory: Path,
     user: str,
-    today: date,
+    now: datetime,
     state_path: Path,
     opener: Callable[[str], None],
+    hour: int = REQUEST_HOUR,
 ) -> bool:
-    """Open the export page once per UTC day unless today's export is already there."""
+    """Open the export page from `hour` local time, once a day, unless an export from today is there."""
+    if now.hour < hour:
+        return False
     try:
-        if export_date(newest_export(directory, user)) == today:
+        if state_path.read_text().strip() == now.date().isoformat():
+            return False
+    except FileNotFoundError:
+        pass
+    try:
+        if export_time(newest_export(directory, user)).astimezone(now.tzinfo).date() >= now.date():
             return False
     except FileNotFoundError:
         pass
     except PermissionError:
         return False
-    try:
-        if state_path.read_text().strip() == today.isoformat():
-            return False
-    except FileNotFoundError:
-        pass
     opener(EXPORT_URL)
     state_path.parent.mkdir(parents=True, exist_ok=True)
-    state_path.write_text(today.isoformat())
+    state_path.write_text(now.date().isoformat())
     return True
+
+
+def _is_complete_export(path: Path) -> bool:
+    if not zipfile.is_zipfile(path):
+        return False
+    with zipfile.ZipFile(path) as zf:
+        return "diary.csv" in zf.namelist()
+
+
+def wait_for_new_export(
+    directory: Path,
+    user: str,
+    previous: str | None,
+    timeout: float = 120,
+    poll: float = 2,
+    sleep: Callable[[float], None] = time.sleep,
+    clock: Callable[[], float] = time.monotonic,
+) -> Path | None:
+    """Poll for a complete export other than `previous`; None if none shows up in `timeout`."""
+    deadline = clock() + timeout
+    while True:
+        try:
+            path = newest_export(directory, user)
+            if path.name != previous and _is_complete_export(path):
+                return path
+        except (FileNotFoundError, zipfile.BadZipFile, OSError):
+            pass
+        if clock() >= deadline:
+            return None
+        sleep(poll)
 
 
 def load_export(path: Path) -> list[DiaryRow]:
@@ -104,7 +139,7 @@ def load_export(path: Path) -> list[DiaryRow]:
 
 def load_latest(directory: Path, user: str, today: date) -> list[DiaryRow]:
     path = newest_export(directory, user)
-    age = (today - export_date(path)).days
+    age = (today - export_time(path).astimezone().date()).days
     if age > 8:
         print(f"letterboxd export: export is {age} days old ({path.name})", file=sys.stderr)
     return load_export(path)

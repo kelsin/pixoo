@@ -3,7 +3,7 @@ import io
 import tempfile
 import zipfile
 import unittest
-from datetime import date
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from unittest import mock
 
@@ -11,7 +11,10 @@ from retro_pixoo.bgg import load_sample_plays
 from retro_pixoo.bgg_render import (
     bgg_h_frame, bgg_recent_frame, bgg_stats_frame, bgg_top_frame,
 )
-from retro_pixoo.lb_export import SAMPLE_YEAR, PosterCache, load_latest, load_sample_diary
+from retro_pixoo import lb_export
+from retro_pixoo.lb_export import (
+    SAMPLE_YEAR, PosterCache, load_latest, load_sample_diary, parse_diary_csv,
+)
 from retro_pixoo.letterboxd import load_sample_feed
 from retro_pixoo.motivation import breathe_frame, handhelds_frame, scroll_frame, voice_frame
 from retro_pixoo.ra import ImageFetcher, load_sample
@@ -33,11 +36,17 @@ def _boom(msg):
 SAMPLE_CSV = Path(__file__).parent.parent / "retro_pixoo" / "sample_diary.csv"
 
 
-def _write_export(directory, day):
+OLD_CSV = (
+    "Date,Name,Year,Letterboxd URI,Rating,Rewatch,Tags,Watched Date\n"
+    "2026-11-17,Wildwood,2026,u,5,,theater:frida,2026-11-16\n"
+)
+
+
+def _write_export(directory, day, csv_text=None):
     """Write a Letterboxd export zip dated `day` holding the sample diary.csv; return its name."""
-    name = f"letterboxd-kelsin13-{day}-00-00-utc.zip"
+    name = f"letterboxd-kelsin13-{day}-12-00-utc.zip"
     with zipfile.ZipFile(Path(directory) / name, "w") as zf:
-        zf.writestr("diary.csv", SAMPLE_CSV.read_text(encoding="utf-8"))
+        zf.writestr("diary.csv", csv_text or SAMPLE_CSV.read_text(encoding="utf-8"))
     return name
 
 
@@ -55,6 +64,24 @@ class _TempPosterCache(unittest.TestCase):
         self.addCleanup(patcher.stop)
         patcher = mock.patch("retro_pixoo.update.open_in_browser")
         self.open_in_browser = patcher.start()
+        self.addCleanup(patcher.stop)
+        # a fixed local "now" (after 06:00) and a fake clock so waiting never sleeps for real
+        fixed = datetime(2026, 11, 27, 9, 0, tzinfo=timezone(timedelta(hours=-8)))
+        patcher = mock.patch("retro_pixoo.update.datetime")
+        patcher.start().now.return_value.astimezone.return_value = fixed
+        self.addCleanup(patcher.stop)
+        self.fake_now = 0.0
+        self.waits = []
+
+        def sleep(seconds):
+            self.waits.append(seconds)
+            self.fake_now += seconds
+
+        real_wait = lb_export.wait_for_new_export
+        patcher = mock.patch(
+            "retro_pixoo.update.wait_for_new_export",
+            lambda *a, **kw: real_wait(*a, sleep=sleep, clock=lambda: self.fake_now, **kw))
+        patcher.start()
         self.addCleanup(patcher.stop)
 
 
@@ -282,6 +309,39 @@ class TagUpdateTests(_TempPosterCache):
             main(["--send", "", "--no-preview", "--lb-export-dir", d])
         self.open_in_browser.assert_called_once_with("https://letterboxd.com/data/export/")
         self.assertIn("letterboxd export: requested a new export", out.getvalue())
+
+    def test_live_main_uses_new_export_in_the_same_run(self):
+        out, err = io.StringIO(), io.StringIO()
+        with tempfile.TemporaryDirectory() as d, \
+             mock.patch("retro_pixoo.update.RAClient", side_effect=RuntimeError("x")), \
+             mock.patch("retro_pixoo.update.LetterboxdClient", side_effect=RuntimeError("y")), \
+             mock.patch("retro_pixoo.update.tag_frames", return_value=[]) as tag_frames_mock, \
+             mock.patch("sys.stderr", err), contextlib.redirect_stdout(out):
+            old = _write_export(d, "2026-11-20", csv_text=OLD_CSV)
+            self.open_in_browser.side_effect = lambda url: _write_export(d, "2026-11-27")
+            main(["--send", "", "--no-preview", "--lb-export-dir", d])
+        rows = tag_frames_mock.call_args.args[0]
+        self.assertEqual(len(rows), len(load_sample_diary()))
+        self.assertNotEqual(len(rows), len(parse_diary_csv(OLD_CSV)))
+        self.assertIn("letterboxd export: requested a new export", out.getvalue())
+        self.assertIn("letterboxd export: got letterboxd-kelsin13-2026-11-27-12-00-utc.zip",
+                      out.getvalue())
+        self.assertNotIn(old, out.getvalue())
+        self.assertNotIn("no new export", err.getvalue())
+
+    def test_live_main_no_new_export_uses_previous_and_warns(self):
+        out, err = io.StringIO(), io.StringIO()
+        with tempfile.TemporaryDirectory() as d, \
+             mock.patch("retro_pixoo.update.RAClient", side_effect=RuntimeError("x")), \
+             mock.patch("retro_pixoo.update.LetterboxdClient", side_effect=RuntimeError("y")), \
+             mock.patch("retro_pixoo.update.tag_frames", return_value=[]) as tag_frames_mock, \
+             mock.patch("sys.stderr", err), contextlib.redirect_stdout(out):
+            _write_export(d, "2026-11-20", csv_text=OLD_CSV)
+            main(["--send", "", "--no-preview", "--lb-export-dir", d])
+        self.assertEqual(len(tag_frames_mock.call_args.args[0]), len(parse_diary_csv(OLD_CSV)))
+        self.assertIn("letterboxd export: no new export after 120s; using the previous one",
+                      err.getvalue())
+        self.assertGreaterEqual(sum(self.waits), 120)
 
     def test_live_main_request_failure_is_not_an_error(self):
         self.open_in_browser.side_effect = OSError("no open")

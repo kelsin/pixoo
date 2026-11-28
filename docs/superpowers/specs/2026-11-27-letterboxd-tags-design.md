@@ -52,7 +52,7 @@ After the BGG segment: four tag pages, then the next motivation slide. `SLIDES` 
 
 ## Daily export request
 
-- No separate agent. `main` (live mode only) calls `request_export_if_due` before collecting pages. It opens `https://letterboxd.com/data/export/` with `/usr/bin/open` when the newest export isn't dated today (UTC, as in the file name) and `~/Library/Caches/retro-pixoo/export_requested` doesn't already hold today's date. A missing Downloads permission means no request (the tags source reports the real error). The current run uses the existing export; the new ZIP is picked up next hour.
+- No separate agent. `main` (live mode only) calls `request_export_if_due` before collecting pages. It opens `https://letterboxd.com/data/export/` with `/usr/bin/open` from 06:00 local time, when the newest export isn't from today (its file-name UTC time converted to local) and `~/Library/Caches/retro-pixoo/export_requested` doesn't already hold today's date. The launchd job has a 06:00 `StartCalendarInterval` so a run happens at 06:00, and any later run that day catches up. A missing Downloads permission means no request (the tags source reports the real error). After requesting, the run waits up to 2 minutes for a new, complete export (a ZIP containing `diary.csv`) and uses it in the same run; if none arrives it prints `letterboxd export: no new export after 120s; using the previous one` to stderr and uses the previous export. A successful pickup prints `letterboxd export: got <name>`.
 - A failed request prints `letterboxd export: request failed: ...` to stderr and is not an error. A successful one prints `letterboxd export: requested a new export`.
 - `make export` opens the page manually; `make uninstall` and `make reload` also remove the old weekly `com.retro-pixoo.lb-export` agent if present.
 - README documents the manual steps: the browser stays signed in to Letterboxd and saves downloads to `~/Downloads`, plus a one-time **Files and Folders → Downloads** grant for the hourly job's Python (macOS blocks background jobs from reading `~/Downloads`; same kind of grant as Local Network).
@@ -63,7 +63,7 @@ After the BGG segment: four tag pages, then the next motivation slide. `SLIDES` 
 
 ## Calls made by Claude (user can override)
 
-- The export is requested at most once per UTC day.
+- The export is requested at most once per local day, from 06:00.
 - The cache location is `~/Library/Caches/retro-pixoo/`.
 - The stale threshold is 8 days.
 - A tag with no films this year shows `NONE YET`.

@@ -3,16 +3,21 @@
 import csv
 import io
 import json
+import os
 import re
+import subprocess
 import sys
 import zipfile
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
+from typing import Callable
 
 from .letterboxd import DiaryEntry
 
 CACHE_PATH = Path.home() / "Library/Caches/retro-pixoo/posters.json"
+EXPORT_URL = "https://letterboxd.com/data/export/"
+REQUEST_PATH = CACHE_PATH.parent / "export_requested"
 SAMPLE_YEAR = 2026
 SAMPLE_PATH = Path(__file__).parent / "sample_diary.csv"
 
@@ -50,7 +55,8 @@ def parse_diary_csv(text: str) -> list[DiaryRow]:
 
 
 def newest_export(directory: Path, user: str) -> Path:
-    found = sorted(Path(directory).glob(f"letterboxd-{user}-*.zip"))
+    os.listdir(directory)  # Path.glob swallows PermissionError; let it propagate
+    found = sorted(Path(directory).glob(f"letterboxd-{user}-[0-9][0-9][0-9][0-9]-*.zip"))
     if not found:
         raise FileNotFoundError(f"no letterboxd-{user}-*.zip in {directory}")
     return found[-1]
@@ -59,6 +65,36 @@ def newest_export(directory: Path, user: str) -> Path:
 def export_date(path: Path) -> date:
     m = re.search(r"(\d{4})-(\d{2})-(\d{2})", Path(path).name)
     return date(int(m[1]), int(m[2]), int(m[3]))
+
+
+def open_in_browser(url: str) -> None:
+    subprocess.run(["/usr/bin/open", url], check=False)
+
+
+def request_export_if_due(
+    directory: Path,
+    user: str,
+    today: date,
+    state_path: Path,
+    opener: Callable[[str], None],
+) -> bool:
+    """Open the export page once per UTC day unless today's export is already there."""
+    try:
+        if export_date(newest_export(directory, user)) == today:
+            return False
+    except FileNotFoundError:
+        pass
+    except PermissionError:
+        return False
+    try:
+        if state_path.read_text().strip() == today.isoformat():
+            return False
+    except FileNotFoundError:
+        pass
+    opener(EXPORT_URL)
+    state_path.parent.mkdir(parents=True, exist_ok=True)
+    state_path.write_text(today.isoformat())
+    return True
 
 
 def load_export(path: Path) -> list[DiaryRow]:

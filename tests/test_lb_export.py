@@ -1,10 +1,13 @@
+import os
 import tempfile
 import unittest
+from unittest import mock
 import zipfile
 from datetime import date
 from pathlib import Path
 
 from retro_pixoo.lb_export import (
+    EXPORT_URL,
     SAMPLE_YEAR,
     PosterCache,
     TagSummary,
@@ -13,6 +16,7 @@ from retro_pixoo.lb_export import (
     load_sample_diary,
     newest_export,
     parse_diary_csv,
+    request_export_if_due,
     summarize,
 )
 from retro_pixoo.letterboxd import DiaryEntry
@@ -24,6 +28,49 @@ CSV = (
     "2026-11-25,Water Lilies,,u,4.5,Yes,theater:frida,2026-11-23\n"
     "2025-12-30,Old,1999,u,3,,theater:frida,2025-12-29\n"
 )
+
+
+class RequestExportTests(unittest.TestCase):
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self._tmp.cleanup)
+        self.tmp = Path(self._tmp.name)
+        self.state = self.tmp / "sub" / "export_requested"
+        self.opener = mock.Mock()
+
+    def _request(self, today, directory=None):
+        return request_export_if_due(
+            directory or self.tmp, "kelsin13", today, self.state, self.opener)
+
+    def test_due_with_no_export(self):
+        self.assertTrue(self._request(date(2026, 11, 27)))
+        self.opener.assert_called_once_with(EXPORT_URL)
+        self.assertEqual(self.state.read_text(), "2026-11-27")
+
+    def test_not_due_when_export_is_today(self):
+        (self.tmp / "letterboxd-kelsin13-2026-11-27-01-56-utc.zip").touch()
+        self.assertFalse(self._request(date(2026, 11, 27)))
+        self.opener.assert_not_called()
+
+    def test_not_due_when_already_requested_today(self):
+        self.assertTrue(self._request(date(2026, 11, 27)))
+        self.assertFalse(self._request(date(2026, 11, 27)))
+        self.opener.assert_called_once()
+
+    def test_due_again_next_day(self):
+        self.assertTrue(self._request(date(2026, 11, 27)))
+        self.assertTrue(self._request(date(2026, 11, 28)))
+        self.assertEqual(self.opener.call_count, 2)
+        self.assertEqual(self.state.read_text(), "2026-11-28")
+
+    @unittest.skipIf(os.geteuid() == 0, "root ignores directory permissions")
+    def test_unreadable_dir_does_not_request(self):
+        d = self.tmp / "locked"
+        d.mkdir()
+        d.chmod(0)
+        self.addCleanup(d.chmod, 0o700)
+        self.assertFalse(self._request(date(2026, 11, 27), d))
+        self.opener.assert_not_called()
 
 
 class LbExportTests(unittest.TestCase):
@@ -68,6 +115,21 @@ class LbExportTests(unittest.TestCase):
     def test_newest_export_missing(self):
         with self.assertRaises(FileNotFoundError):
             newest_export(self.tmp, "kelsin13")
+
+    def test_newest_export_user_prefix_is_anchored(self):
+        (self.tmp / "letterboxd-kelsin13-2026-11-28-01-56-utc.zip").touch()
+        with self.assertRaises(FileNotFoundError):
+            newest_export(self.tmp, "kelsin")
+
+    @unittest.skipIf(os.geteuid() == 0, "root ignores directory permissions")
+    def test_newest_export_unreadable_dir_raises_permission_error(self):
+        d = self.tmp / "locked"
+        d.mkdir()
+        (d / "letterboxd-kelsin13-2026-11-28-01-56-utc.zip").touch()
+        d.chmod(0)
+        self.addCleanup(d.chmod, 0o700)
+        with self.assertRaises(PermissionError):
+            newest_export(d, "kelsin13")
 
     def test_load_export_reads_zip(self):
         z = self.tmp / "letterboxd-kelsin13-2026-11-28-01-56-utc.zip"

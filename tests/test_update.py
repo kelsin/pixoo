@@ -50,6 +50,12 @@ class _TempPosterCache(unittest.TestCase):
         patcher = mock.patch("retro_pixoo.update.CACHE_PATH", Path(tmp.name) / "posters.json")
         patcher.start()
         self.addCleanup(patcher.stop)
+        patcher = mock.patch("retro_pixoo.update.REQUEST_PATH", Path(tmp.name) / "export_requested")
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        patcher = mock.patch("retro_pixoo.update.open_in_browser")
+        self.open_in_browser = patcher.start()
+        self.addCleanup(patcher.stop)
 
 
 class UpdateTests(_TempPosterCache):
@@ -226,8 +232,9 @@ class BggUpdateTests(_TempPosterCache):
         self.assertEqual(err.getvalue(), "")
 
 
-class TagUpdateTests(unittest.TestCase):
+class TagUpdateTests(_TempPosterCache):
     def setUp(self):
+        super().setUp()
         self.fetcher = ImageFetcher(offline=True)
         self.p, self.e = load_sample(), load_sample_feed()
         self.plays = load_sample_plays()
@@ -264,6 +271,31 @@ class TagUpdateTests(unittest.TestCase):
             tags=load_sample_diary, posters=cache, year=SAMPLE_YEAR)
         self.assertEqual(errors, [])
         self.assertEqual(len(pages), 20)
+
+    def test_live_main_requests_export_when_none(self):
+        out = io.StringIO()
+        with tempfile.TemporaryDirectory() as d, \
+             mock.patch("retro_pixoo.update.RAClient", side_effect=RuntimeError("x")), \
+             mock.patch("retro_pixoo.update.LetterboxdClient", side_effect=RuntimeError("y")), \
+             mock.patch("sys.stderr", new_callable=io.StringIO), \
+             contextlib.redirect_stdout(out):
+            main(["--send", "", "--no-preview", "--lb-export-dir", d])
+        self.open_in_browser.assert_called_once_with("https://letterboxd.com/data/export/")
+        self.assertIn("letterboxd export: requested a new export", out.getvalue())
+
+    def test_live_main_request_failure_is_not_an_error(self):
+        self.open_in_browser.side_effect = OSError("no open")
+        err = io.StringIO()
+        with tempfile.TemporaryDirectory() as d, \
+             mock.patch("retro_pixoo.update.RAClient", side_effect=RuntimeError("x")), \
+             mock.patch("retro_pixoo.update.LetterboxdClient", side_effect=RuntimeError("y")), \
+             mock.patch("sys.stderr", err):
+            main(["--send", "", "--no-preview", "--lb-export-dir", d])
+        self.assertIn("letterboxd export: request failed: no open", err.getvalue())
+
+    def test_sample_main_never_requests_export(self):
+        main(["--sample", "--send", "", "--no-preview"])
+        self.open_in_browser.assert_not_called()
 
     def test_load_latest_stale_export_warns(self):
         with tempfile.TemporaryDirectory() as d:

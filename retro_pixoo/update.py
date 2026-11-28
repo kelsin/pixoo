@@ -8,7 +8,7 @@ from __future__ import annotations
 import argparse
 import os
 import sys
-from datetime import date
+from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Callable
 
@@ -19,7 +19,8 @@ from .bgg_render import (
     bgg_h_frame, bgg_recent_frame, bgg_stats_frame, bgg_top_frame, needed_games,
 )
 from .lb_export import (
-    CACHE_PATH, SAMPLE_YEAR, DiaryRow, PosterCache, load_latest, load_sample_diary,
+    CACHE_PATH, REQUEST_PATH, SAMPLE_YEAR, DiaryRow, PosterCache, load_latest, load_sample_diary,
+    open_in_browser, request_export_if_due,
 )
 from .letterboxd import DiaryEntry, LetterboxdClient, load_sample_feed
 from .motivation import SLIDES
@@ -142,6 +143,14 @@ def main(argv: list[str] | None = None) -> int:
         bgg = None
         tags = lambda: load_latest(args.lb_export_dir, args.lb_user, date.today())  # noqa: E731
         posters, year = PosterCache(CACHE_PATH), None
+        try:
+            if request_export_if_due(args.lb_export_dir, args.lb_user,
+                                     datetime.now(timezone.utc).date(), REQUEST_PATH,
+                                     open_in_browser):
+                print("letterboxd export: requested a new export")
+        except Exception as e:
+            print(f"letterboxd export: request failed: {str(e) or type(e).__name__}",
+                  file=sys.stderr)
         if os.environ.get("BGG_TOKEN"):
             bgg = lambda: BggClient().plays(args.bgg_user, date.today().year)  # noqa: E731
 

@@ -7,8 +7,9 @@ BGG_USER ?= Kelsin
 
 LABEL := com.retro-pixoo.hourly
 PLIST := $(HOME)/Library/LaunchAgents/$(LABEL).plist
-EXPORT_LABEL := com.retro-pixoo.lb-export
-EXPORT_PLIST := $(HOME)/Library/LaunchAgents/$(EXPORT_LABEL).plist
+# Removed weekly export agent; uninstall/reload still clean it up
+LEGACY_LABEL := com.retro-pixoo.lb-export
+LEGACY_PLIST := $(HOME)/Library/LaunchAgents/$(LEGACY_LABEL).plist
 LOG   := $(HOME)/Library/Logs/retro-pixoo.log
 GUI   := gui/$(shell id -u)
 
@@ -37,32 +38,28 @@ keychain-ra: ## Store the RetroAchievements API key in the login Keychain (promp
 keychain-bgg: ## Store the BGG token in the login Keychain (prompts)
 	security add-generic-password -s retro_pixoo_bgg -a "$$USER" -w
 
-plist: ## Write the hourly and weekly-export launchd agent plists (uses REPO, PIXOO_IP, *_USER)
+plist: ## Write the hourly launchd agent plist (uses REPO, PIXOO_IP, *_USER)
 	@mkdir -p $(dir $(PLIST))
 	sed -e 's|@LABEL@|$(LABEL)|g' -e 's|@REPO@|$(REPO)|g' -e 's|@PIXOO_IP@|$(PIXOO_IP)|g' \
 	    -e 's|@RA_USER@|$(RA_USER)|g' -e 's|@LB_USER@|$(LB_USER)|g' \
 	    -e 's|@BGG_USER@|$(BGG_USER)|g' -e 's|@LOG@|$(LOG)|g' \
 	    launchd/$(LABEL).plist.in > $(PLIST)
 	plutil -lint $(PLIST)
-	sed -e 's|@EXPORT_LABEL@|$(EXPORT_LABEL)|g' -e 's|@LOG@|$(LOG)|g' \
-	    launchd/$(EXPORT_LABEL).plist.in > $(EXPORT_PLIST)
-	plutil -lint $(EXPORT_PLIST)
 
-install: sync plist ## Sync deps, write the plists and load them (hourly update runs once now)
+install: sync plist ## Sync deps, write the plist and load it (hourly update runs once now)
 	launchctl bootstrap $(GUI) $(PLIST)
-	launchctl bootstrap $(GUI) $(EXPORT_PLIST)
 
-uninstall: ## Stop and unload both agents, delete their plists
+uninstall: ## Stop and unload the agent, delete its plist
 	-launchctl bootout $(GUI)/$(LABEL)
-	-launchctl bootout $(GUI)/$(EXPORT_LABEL)
-	rm -f $(PLIST) $(EXPORT_PLIST)
+	-launchctl bootout $(GUI)/$(LEGACY_LABEL)
+	rm -f $(PLIST) $(LEGACY_PLIST)
 
-reload: ## Rewrite the plists and reload both agents (after changing settings)
+reload: ## Rewrite the plist and reload the agent (after changing settings)
 	-launchctl bootout $(GUI)/$(LABEL)
-	-launchctl bootout $(GUI)/$(EXPORT_LABEL)
+	-launchctl bootout $(GUI)/$(LEGACY_LABEL)
+	rm -f $(LEGACY_PLIST)
 	$(MAKE) plist
 	launchctl bootstrap $(GUI) $(PLIST)
-	launchctl bootstrap $(GUI) $(EXPORT_PLIST)
 
 run: ## Run the agent now
 	launchctl kickstart -k $(GUI)/$(LABEL)

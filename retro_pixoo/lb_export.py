@@ -4,6 +4,7 @@ import csv
 import io
 import json
 import re
+import sys
 import zipfile
 from dataclasses import dataclass
 from datetime import date
@@ -63,6 +64,14 @@ def export_date(path: Path) -> date:
 def load_export(path: Path) -> list[DiaryRow]:
     with zipfile.ZipFile(path) as zf:
         return parse_diary_csv(zf.read("diary.csv").decode("utf-8"))
+
+
+def load_latest(directory: Path, user: str, today: date) -> list[DiaryRow]:
+    path = newest_export(directory, user)
+    age = (today - export_date(path)).days
+    if age > 8:
+        print(f"letterboxd export: export is {age} days old ({path.name})", file=sys.stderr)
+    return load_export(path)
 
 
 def summarize(rows: list[DiaryRow], tag: str, year: int) -> TagSummary:
